@@ -470,14 +470,13 @@ Foto válida guardada con metadatos simples (luz, nitidez) y accesible para diag
 # Prototipos {#prototipos}
 
 1.-[https://symbol-web-17146116.figma.site/](https://symbol-web-17146116.figma.site/) 
-
-<img width="682" height="654" alt="image" src="https://github.com/user-attachments/assets/dfde3cd8-e255-4243-88b6-e4b97f19c207" />
+<img width="612" height="412" alt="image" src="https://github.com/user-attachments/assets/ddc6627f-5cc8-4134-a8e9-5b618e464f48" />
 
 	
 2\.[https://jade-clasp-80742332.figma.site/](https://jade-clasp-80742332.figma.site/)
+<img width="618" height="425" alt="image" src="https://github.com/user-attachments/assets/0c287132-bd3e-4944-af53-b85f9403e3de" />
 
-![][image5]![][image6]![][image7]
 
 3\.[https://hurry-seam-03940975.figma.site/](https://hurry-seam-03940975.figma.site/)
+<img width="618" height="425" alt="image" src="https://github.com/user-attachments/assets/cdf89481-19b7-4fff-96f1-47809e233b17" />
 
-![][image8]![][image9]![][image10]
