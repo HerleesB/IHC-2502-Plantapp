@@ -464,7 +464,8 @@ Foto válida guardada con metadatos simples (luz, nitidez) y accesible para diag
 
 # Diagrama de Gantt {#diagrama-de-gantt}
 
-![][image1]
+<img width="682" height="654" alt="image" src="https://github.com/user-attachments/assets/e2a1a63c-44d5-45c2-9462-1d1cb082f98c" />
+
 
 # Prototipos {#prototipos}
 
