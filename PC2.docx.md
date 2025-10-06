@@ -480,3 +480,5 @@ Foto válida guardada con metadatos simples (luz, nitidez) y accesible para diag
 3\.[https://hurry-seam-03940975.figma.site/](https://hurry-seam-03940975.figma.site/)
 <img width="618" height="425" alt="image" src="https://github.com/user-attachments/assets/cdf89481-19b7-4fff-96f1-47809e233b17" />
 
+
+Escogemos el prototipo 3 debido a que este diseño es ideal porque combina claridad, enfoque en el usuario y buena jerarquía visual, lo que mejora la experiencia y eficiencia al usar la aplicación.
