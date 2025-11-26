@@ -1,0 +1,23 @@
+# FastAPI y servidor
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# Procesamiento de imágenes (versión actualizada compatible)
+pillow>=10.0.0
+
+# Cliente de Groq AI
+groq>=0.4.0
+
+# Validación de datos
+pydantic>=2.5.0
+pydantic-settings>=2.0.0
+
+# Variables de entorno
+python-dotenv>=1.0.0
+
+# Text-to-Speech
+gtts>=2.4.0
+
+# Base de datos
+sqlalchemy>=2.0.0

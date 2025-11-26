@@ -1,0 +1,101 @@
+"""Base de datos SQLAlchemy"""
+from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, DateTime, Text, ForeignKey
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, relationship
+from datetime import datetime
+import os
+
+SQLALCHEMY_DATABASE_URL = "sqlite:///./jardin.db"
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+# ========== MODELOS ORM ==========
+class UserDB(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, index=True)
+    username = Column(String, unique=True, index=True)
+    full_name = Column(String, nullable=True)
+    hashed_password = Column(String)
+    level = Column(Integer, default=1)
+    xp = Column(Integer, default=0)
+    points = Column(Integer, default=0)
+    streak_days = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    plants = relationship("PlantDB", back_populates="owner")
+    diagnoses = relationship("DiagnosisDB", back_populates="user")
+
+class PlantDB(Base):
+    __tablename__ = "plants"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    name = Column(String, index=True)
+    species = Column(String, nullable=True)
+    description = Column(Text, nullable=True)
+    image_url = Column(String, nullable=True)
+    status = Column(String, default="healthy")
+    health_score = Column(Integer, default=100)
+    last_watered = Column(DateTime, nullable=True)
+    last_fertilized = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    owner = relationship("UserDB", back_populates="plants")
+    diagnoses = relationship("DiagnosisDB", back_populates="plant")
+
+class DiagnosisDB(Base):
+    __tablename__ = "diagnoses"
+    id = Column(Integer, primary_key=True, index=True)
+    plant_id = Column(Integer, ForeignKey("plants.id"))
+    user_id = Column(Integer, ForeignKey("users.id"))
+    image_url = Column(String)
+    diagnosis_text = Column(Text)
+    confidence = Column(Float)
+    disease_name = Column(String, nullable=True)
+    severity = Column(String)
+    recommendations = Column(Text)  # JSON string
+    created_at = Column(DateTime, default=datetime.utcnow)
+    is_shared = Column(Boolean, default=False)
+    plant = relationship("PlantDB", back_populates="diagnoses")
+    user = relationship("UserDB", back_populates="diagnoses")
+
+class CommunityPostDB(Base):
+    __tablename__ = "community_posts"
+    id = Column(Integer, primary_key=True, index=True)
+    diagnosis_id = Column(Integer, ForeignKey("diagnoses.id"))
+    user_id = Column(Integer, ForeignKey("users.id"))
+    is_anonymous = Column(Boolean, default=False)
+    likes = Column(Integer, default=0)
+    comments_count = Column(Integer, default=0)
+    status = Column(String, default="pending")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class CommentDB(Base):
+    __tablename__ = "comments"
+    id = Column(Integer, primary_key=True, index=True)
+    post_id = Column(Integer, ForeignKey("community_posts.id"))
+    user_id = Column(Integer, ForeignKey("users.id"))
+    content = Column(Text)
+    is_solution = Column(Boolean, default=False)
+    likes = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class AchievementDB(Base):
+    __tablename__ = "achievements"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    name = Column(String)
+    description = Column(Text)
+    icon = Column(String)
+    points = Column(Integer)
+    unlocked = Column(Boolean, default=False)
+    unlocked_at = Column(DateTime, nullable=True)
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+def init_db():
+    Base.metadata.create_all(bind=engine)

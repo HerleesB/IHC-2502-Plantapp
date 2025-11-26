@@ -1,0 +1,317 @@
+# ============================================
+#  GITIGNORE - Jardín Inteligente
+#  Proyecto: Frontend (Android) + Backend (Python)
+# ============================================
+
+# ============================================
+# GENERAL - Archivos del Sistema
+# ============================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+
+# ============================================
+# IDEs y Editores
+# ============================================
+
+# IntelliJ IDEA / Android Studio
+.idea/
+*.iml
+*.ipr
+*.iws
+.idea_modules/
+out/
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/gradle.xml
+.idea/assetWizardSettings.xml
+.idea/dictionaries
+.idea/libraries
+.idea/shelf
+.idea/caches
+.idea/modules.xml
+.idea/*.xml
+!.idea/codeStyles
+!.idea/runConfigurations
+
+# VSCode
+.vscode/
+*.code-workspace
+.history/
+
+# Vim
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+
+# ============================================
+# BACKEND - Python / FastAPI
+# ============================================
+
+# Entorno Virtual Python
+backend/.venv/
+backend/venv/
+backend/env/
+backend/ENV/
+backend/.env.local
+backend/.env.*.local
+
+# Variables de Entorno (MANTENER .env.example si existe)
+backend/.env
+
+# Archivos de Python compilados
+backend/**/__pycache__/
+backend/**/*.py[cod]
+backend/**/*$py.class
+backend/**/*.so
+backend/**/*.egg
+backend/**/*.egg-info/
+backend/**/dist/
+backend/**/build/
+backend/**/.eggs/
+backend/**/parts/
+backend/**/sdist/
+backend/**/var/
+backend/**/wheels/
+
+# PyCharm
+backend/.idea/
+
+# Pytest
+backend/.pytest_cache/
+backend/.coverage
+backend/htmlcov/
+backend/.tox/
+
+# MyPy
+backend/.mypy_cache/
+backend/.dmypy.json
+backend/dmypy.json
+
+# Base de datos (si es SQLite local)
+backend/**/*.db
+backend/**/*.sqlite
+backend/**/*.sqlite3
+
+# Logs
+backend/**/*.log
+backend/**/logs/
+
+# Caché y temporales
+backend/cache/
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/temp/
+backend/tmp/
+
+# Jupyter Notebook
+backend/.ipynb_checkpoints
+
+# ============================================
+# FRONTEND - Android / Kotlin
+# ============================================
+
+# Gradle
+frontend/.gradle/
+frontend/build/
+frontend/app/build/
+frontend/**/build/
+frontend/local.properties
+
+# Android Studio
+frontend/.idea/
+frontend/*.iml
+frontend/.externalNativeBuild
+frontend/.cxx
+frontend/captures/
+frontend/.navigation/
+frontend/output.json
+
+# NDK
+frontend/obj/
+
+# Signing files (NUNCA subir al repo)
+frontend/**/*.jks
+frontend/**/*.keystore
+frontend/**/keystore.properties
+frontend/**/signing.properties
+
+# Android profiling
+frontend/**/*.hprof
+
+# IntelliJ
+frontend/out/
+
+# User-specific configurations
+frontend/.idea/workspace.xml
+frontend/.idea/tasks.xml
+frontend/.idea/gradle.xml
+frontend/.idea/assetWizardSettings.xml
+frontend/.idea/dictionaries
+frontend/.idea/libraries
+frontend/.idea/jarRepositories.xml
+frontend/.idea/compiler.xml
+frontend/.idea/misc.xml
+frontend/.idea/modules.xml
+
+# Lint
+frontend/lint/generated/
+frontend/lint/outputs/
+frontend/lint/tmp/
+frontend/**/lint-results*.html
+frontend/**/lint-results*.xml
+
+# Cache de imágenes temporales
+frontend/cache/
+frontend/app/src/main/assets/cache/
+
+# ============================================
+# DEPENDENCIAS Y PAQUETES
+# ============================================
+
+# Node modules (si hay algo de Node.js)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ============================================
+# ARCHIVOS DE CONFIGURACIÓN SENSIBLES
+# ============================================
+
+# API Keys y secretos
+**/.env
+**/.env.local
+**/.env.*.local
+**/secrets.yaml
+**/secrets.json
+**/*.pem
+**/*.key
+**/*.cert
+
+# Excepciones: Mantener archivos de ejemplo
+!**/.env.example
+!**/secrets.example.yaml
+
+# ============================================
+# ARCHIVOS TEMPORALES Y DE PRUEBA
+# ============================================
+
+# Archivos de prueba temporales
+**/test_*.tmp
+**/temp_*
+**/tmp_*
+
+# Backups
+**/*.bak
+**/*.backup
+**/*.old
+**/*.orig
+
+# ============================================
+# ARCHIVOS GRANDES Y MEDIA
+# ============================================
+
+# Imágenes temporales de prueba (mantener ejemplos si es necesario)
+backend/uploads/*.jpg
+backend/uploads/*.jpeg
+backend/uploads/*.png
+backend/uploads/*.gif
+backend/uploads/*.mp4
+backend/uploads/*.mov
+
+# Excepciones: Mantener imágenes de ejemplo
+!backend/uploads/example.jpg
+!backend/uploads/sample.jpg
+
+# ============================================
+# DOCUMENTACIÓN GENERADA
+# ============================================
+
+# Documentación auto-generada
+docs/_build/
+docs/.doctrees/
+site/
+
+# ============================================
+# OTROS
+# ============================================
+
+# Archivos comprimidos
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Archivos de sistema y temporales
+*.swp
+*.swo
+*~
+.*.swp
+.*.swo
+
+# Archivos de debugging
+debug/
+debug.log
+error.log
+
+# Coverage reports
+coverage/
+*.cover
+.hypothesis/
+
+# ============================================
+# MANTENER ESTOS ARCHIVOS (Excepciones)
+# ============================================
+
+# Mantener archivo vacío para uploads
+!backend/uploads/.gitkeep
+
+# Mantener ejemplos de configuración
+!**/.env.example
+!**/config.example.json
+
+# Mantener README y documentación
+!**/README.md
+!**/CHANGELOG.md
+!**/LICENSE
+
+# Mantener scripts de utilidad
+!**/*.sh
+!**/*.bat
+
+# ============================================
+# NOTAS
+# ============================================
+
+# Este .gitignore cubre:
+# - Backend: Python, FastAPI, entornos virtuales, caché
+# - Frontend: Android, Gradle, builds, signing keys
+# - General: IDEs, sistema operativo, archivos temporales
+#
+# IMPORTANTE:
+# - NUNCA subas .env con API keys reales
+# - NUNCA subas archivos .jks o .keystore (signing keys)
+# - Las bases de datos locales (.db) no se suben
+# - Los builds y caché se regeneran automáticamente
