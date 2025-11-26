@@ -2,6 +2,7 @@ package com.jardin.inteligente.viewmodel
 
 import android.content.Context
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.jardin.inteligente.model.*
 import com.jardin.inteligente.repository.AuthRepository
@@ -89,8 +90,6 @@ class AuthViewModel(context: Context) : ViewModel() {
 }
 
 // Factory
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 
 class AuthViewModelFactory(private val context: Context) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {

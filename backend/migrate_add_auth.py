@@ -3,14 +3,22 @@ Script de migración para agregar autenticación
 Ejecutar: python migrate_add_auth.py
 """
 import sys
-import os
 from pathlib import Path
 
 # Agregar el directorio app al path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from sqlalchemy import create_engine, inspect, text
-from app.models.database import Base, UserDB, PlantDB, DiagnosisDB, CommunityPostDB, CommentDB, AchievementDB
+from sqlalchemy.orm import sessionmaker
+from app.models.database import (
+    Base,
+    UserDB,
+    PlantDB,
+    DiagnosisDB,
+    CommunityPostDB,
+    CommentDB,
+    AchievementDB
+)
 from app.utils.auth import get_password_hash
 import logging
 
@@ -19,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 DATABASE_URL = "sqlite:///./jardin.db"
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+Session = sessionmaker(bind=engine)
 
 
 def check_table_exists(table_name: str) -> bool:
@@ -27,24 +36,20 @@ def check_table_exists(table_name: str) -> bool:
     return table_name in inspector.get_table_names()
 
 
-def migrate_database():
-    """Ejecuta la migración completa"""
-    logger.info("=" * 60)
-    logger.info("🔄 INICIANDO MIGRACIÓN DE AUTENTICACIÓN")
-    logger.info("=" * 60)
+def create_or_update_demo_user(session):
+    """Crea o actualiza el usuario demo - CORRIGE BUG ORIGINAL"""
+    demo_user = session.query(UserDB).filter(
+        (UserDB.username == "demo") | (UserDB.email == "demo@jardin.app")
+    ).first()
     
-    # 1. Crear tabla users si no existe
-    if not check_table_exists("users"):
-        logger.info("📝 Creando tabla 'users'...")
-        UserDB.__table__.create(engine)
-        logger.info("✅ Tabla 'users' creada")
-        
-        # Crear usuario demo para migración de datos existentes
-        logger.info("👤 Creando usuario demo para datos existentes...")
-        from sqlalchemy.orm import sessionmaker
-        Session = sessionmaker(bind=engine)
-        session = Session()
-        
+    if demo_user:
+        logger.info(f"ℹ️  Usuario demo ya existe (ID: {demo_user.id})")
+        demo_user.hashed_password = get_password_hash("demo123")
+        session.commit()
+        logger.info("✅ Contraseña actualizada")
+        return demo_user
+    else:
+        logger.info("👤 Creando usuario demo...")
         demo_user = UserDB(
             email="demo@jardin.app",
             username="demo",
@@ -57,56 +62,63 @@ def migrate_database():
         )
         session.add(demo_user)
         session.commit()
+        session.refresh(demo_user)
         logger.info(f"✅ Usuario demo creado con ID: {demo_user.id}")
-        
-        # 2. Actualizar registros existentes sin user_id
-        logger.info("🔄 Asignando datos existentes al usuario demo...")
-        
-        # Plantas sin usuario
-        result = session.execute(
-            text("UPDATE plants SET user_id = :user_id WHERE user_id IS NULL OR user_id = 1"),
-            {"user_id": demo_user.id}
-        )
-        logger.info(f"✅ {result.rowcount} plantas actualizadas")
-        
-        # Diagnósticos sin usuario
-        result = session.execute(
-            text("UPDATE diagnoses SET user_id = :user_id WHERE user_id IS NULL OR user_id = 1"),
-            {"user_id": demo_user.id}
-        )
-        logger.info(f"✅ {result.rowcount} diagnósticos actualizados")
-        
-        # Posts de comunidad sin usuario
-        if check_table_exists("community_posts"):
-            result = session.execute(
-                text("UPDATE community_posts SET user_id = :user_id WHERE user_id IS NULL OR user_id = 1"),
-                {"user_id": demo_user.id}
-            )
-            logger.info(f"✅ {result.rowcount} posts de comunidad actualizados")
-        
-        # Comentarios sin usuario
-        if check_table_exists("comments"):
-            result = session.execute(
-                text("UPDATE comments SET user_id = :user_id WHERE user_id IS NULL OR user_id = 1"),
-                {"user_id": demo_user.id}
-            )
-            logger.info(f"✅ {result.rowcount} comentarios actualizados")
-        
-        # Logros sin usuario
-        if check_table_exists("achievements"):
-            result = session.execute(
-                text("UPDATE achievements SET user_id = :user_id WHERE user_id IS NULL OR user_id = 1"),
-                {"user_id": demo_user.id}
-            )
-            logger.info(f"✅ {result.rowcount} logros actualizados")
-        
-        session.commit()
-        session.close()
-        
-    else:
-        logger.info("ℹ️  Tabla 'users' ya existe, saltando creación")
+        return demo_user
+
+
+def migrate_existing_data(session, user_id: int):
+    """Asigna datos existentes sin user_id al usuario demo"""
+    logger.info("🔄 Asignando datos existentes al usuario demo...")
     
-    # 3. Verificar que todas las tablas tengan las columnas necesarias
+    # Plantas sin usuario
+    result = session.execute(
+        text("UPDATE plants SET user_id = :user_id WHERE user_id IS NULL"),
+        {"user_id": user_id}
+    )
+    if result.rowcount > 0:
+        logger.info(f"✅ {result.rowcount} plantas asignadas")
+    
+    # Diagnósticos sin usuario
+    result = session.execute(
+        text("UPDATE diagnoses SET user_id = :user_id WHERE user_id IS NULL"),
+        {"user_id": user_id}
+    )
+    if result.rowcount > 0:
+        logger.info(f"✅ {result.rowcount} diagnósticos asignados")
+    
+    # Posts de comunidad sin usuario
+    if check_table_exists("community_posts"):
+        result = session.execute(
+            text("UPDATE community_posts SET user_id = :user_id WHERE user_id IS NULL"),
+            {"user_id": user_id}
+        )
+        if result.rowcount > 0:
+            logger.info(f"✅ {result.rowcount} posts asignados")
+    
+    # Comentarios sin usuario
+    if check_table_exists("comments"):
+        result = session.execute(
+            text("UPDATE comments SET user_id = :user_id WHERE user_id IS NULL"),
+            {"user_id": user_id}
+        )
+        if result.rowcount > 0:
+            logger.info(f"✅ {result.rowcount} comentarios asignados")
+    
+    # Logros sin usuario
+    if check_table_exists("achievements"):
+        result = session.execute(
+            text("UPDATE achievements SET user_id = :user_id WHERE user_id IS NULL"),
+            {"user_id": user_id}
+        )
+        if result.rowcount > 0:
+            logger.info(f"✅ {result.rowcount} logros asignados")
+    
+    session.commit()
+
+
+def verify_table_structure():
+    """Verifica que todas las tablas tengan las columnas necesarias"""
     logger.info("🔍 Verificando estructura de tablas...")
     inspector = inspect(engine)
     
@@ -124,22 +136,65 @@ def migrate_database():
             missing = [col for col in columns if col not in existing_columns]
             if missing:
                 logger.warning(f"⚠️  Tabla '{table}' no tiene columnas: {missing}")
-                logger.warning(f"   Se recomienda ejecutar Base.metadata.create_all() o recrear la BD")
+                logger.warning("   Se recomienda ejecutar Base.metadata.create_all()")
             else:
                 logger.info(f"✅ Tabla '{table}' tiene todas las columnas requeridas")
+
+
+def migrate_database():
+    """Ejecuta la migración completa"""
+    logger.info("=" * 60)
+    logger.info("🔄 INICIANDO MIGRACIÓN DE AUTENTICACIÓN")
+    logger.info("=" * 60)
     
-    logger.info("=" * 60)
-    logger.info("✅ MIGRACIÓN COMPLETADA")
-    logger.info("=" * 60)
-    logger.info("")
-    logger.info("📝 CREDENCIALES DEL USUARIO DEMO:")
-    logger.info("   Email: demo@jardin.app")
-    logger.info("   Username: demo")
-    logger.info("   Password: demo123")
-    logger.info("")
-    logger.info("🔐 Para producción, cambiar SECRET_KEY en .env:")
-    logger.info("   SECRET_KEY=tu-clave-secreta-super-segura-aleatoria")
-    logger.info("")
+    session = Session()
+    
+    try:
+        # 1. Crear tabla users si no existe
+        if not check_table_exists("users"):
+            logger.info("📝 Creando tabla 'users'...")
+            Base.metadata.create_all(engine)
+            logger.info("✅ Tabla 'users' creada")
+        else:
+            logger.info("ℹ️  Tabla 'users' ya existe")
+        
+        # 2. Crear o actualizar usuario demo (SIEMPRE - CORRIGE BUG)
+        demo_user = create_or_update_demo_user(session)
+        
+        # 3. Migrar datos existentes
+        migrate_existing_data(session, demo_user.id)
+        
+        # 4. Verificar estructura de tablas
+        verify_table_structure()
+        
+        # 5. Verificación final
+        verification = session.query(UserDB).filter(
+            UserDB.username == "demo"
+        ).first()
+        
+        if verification:
+            logger.info("")
+            logger.info("=" * 60)
+            logger.info("✅ MIGRACIÓN COMPLETADA")
+            logger.info("=" * 60)
+            logger.info("")
+            logger.info("📝 CREDENCIALES DEL USUARIO DEMO:")
+            logger.info("   Email: demo@jardin.app")
+            logger.info("   Username: demo")
+            logger.info("   Password: demo123")
+            logger.info("")
+            logger.info("🔐 Para producción, cambiar SECRET_KEY en .env:")
+            logger.info("   SECRET_KEY=tu-clave-secreta-super-segura-aleatoria")
+            logger.info("")
+        else:
+            logger.error("❌ ERROR: Usuario demo no existe después de la migración")
+            raise Exception("Usuario demo no se guardó correctamente")
+        
+    except Exception as e:
+        session.rollback()
+        raise e
+    finally:
+        session.close()
 
 
 if __name__ == "__main__":
