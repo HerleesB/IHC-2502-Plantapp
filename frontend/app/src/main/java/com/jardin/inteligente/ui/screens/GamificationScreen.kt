@@ -187,8 +187,9 @@ fun PlayerStatsCard(
                     Text("${(xp.toFloat() / nextLevelXp * 100).toInt()}%", style = MaterialTheme.typography.bodySmall)
                 }
                 Spacer(modifier = Modifier.height(4.dp))
+                // ✅ CORREGIDO: progress sin llaves
                 LinearProgressIndicator(
-                    progress = { xp.toFloat() / nextLevelXp },
+                    progress = xp.toFloat() / nextLevelXp,
                     modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
                     color = GreenPrimary
                 )

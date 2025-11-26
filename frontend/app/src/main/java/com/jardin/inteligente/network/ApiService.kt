@@ -167,52 +167,7 @@ interface ApiService {
         @Header("Authorization") token: String
     ): Response<UserResponse>
     
-    // ========== COMMUNITY ENDPOINTS ==========
-    
-    /**
-     * Obtener posts de la comunidad
-     */
-    @GET("api/community/posts")
-    suspend fun getCommunityPosts(
-        @Query("limit") limit: Int = 20
-    ): Response<List<CommunityPostResponse>>
-    
-    /**
-     * Crear post en comunidad
-     */
-    @POST("api/community/posts")
-    suspend fun createCommunityPost(
-        @Body post: CommunityPostCreateRequest,
-        @Query("user_id") userId: Int = 1
-    ): Response<CommunityPostResponse>
-    
-    /**
-     * Agregar comentario
-     */
-    @POST("api/community/posts/{post_id}/comments")
-    suspend fun addComment(
-        @Path("post_id") postId: Int,
-        @Body comment: CommentCreateRequest,
-        @Query("user_id") userId: Int = 1
-    ): Response<Unit>
-    
-    // ========== GAMIFICATION ENDPOINTS ==========
-    
-    /**
-     * Obtener logros del usuario
-     */
-    @GET("api/gamification/achievements/{user_id}")
-    suspend fun getAchievements(
-        @Path("user_id") userId: Int
-    ): Response<AchievementsResponse>
-    
-    /**
-     * Obtener misiones del usuario
-     */
-    @GET("api/gamification/missions/{user_id}")
-    suspend fun getMissions(
-        @Path("user_id") userId: Int
-    ): Response<MissionsResponse>
+
     
     companion object {
         /**
