@@ -1,10 +1,12 @@
 package com.jardin.inteligente.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.jardin.inteligente.model.*
-import com.jardin.inteligente.network.ApiService
 import com.jardin.inteligente.repository.PlantRepository
+import com.jardin.inteligente.repository.AuthRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,10 +19,13 @@ data class MyGardenUiState(
     val stats: ProgressStatsResponse? = null
 )
 
-class MyGardenViewModel : ViewModel() {
+/**
+ * ViewModel para Mi Jardín (CU-04, CU-16)
+ */
+class MyGardenViewModel(private val context: Context) : ViewModel() {
     
-    private val repository = PlantRepository(ApiService.getInstance())
-    private val userId = 1 // TODO: Get from auth
+    private val plantRepository = PlantRepository(context)
+    private val authRepository = AuthRepository(context)
     
     private val _uiState = MutableStateFlow(MyGardenUiState())
     val uiState: StateFlow<MyGardenUiState> = _uiState.asStateFlow()
@@ -34,7 +39,9 @@ class MyGardenViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             
-            when (val result = repository.getUserPlants(userId)) {
+            val userId = authRepository.getUserId().takeIf { it > 0 } ?: 1
+            
+            when (val result = plantRepository.getUserPlants(userId)) {
                 is ApiResult.Success -> {
                     _uiState.value = _uiState.value.copy(
                         plants = result.data,
@@ -54,7 +61,9 @@ class MyGardenViewModel : ViewModel() {
     
     fun loadStats() {
         viewModelScope.launch {
-            when (val result = repository.getProgressStats(userId)) {
+            val userId = authRepository.getUserId().takeIf { it > 0 } ?: 1
+            
+            when (val result = plantRepository.getProgressStats(userId)) {
                 is ApiResult.Success -> {
                     _uiState.value = _uiState.value.copy(stats = result.data)
                 }
@@ -63,19 +72,23 @@ class MyGardenViewModel : ViewModel() {
         }
     }
     
-    fun createPlant(name: String, species: String? = null) {
+    fun createPlant(name: String, species: String? = null, location: String? = null) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
+            
+            val userId = authRepository.getUserId().takeIf { it > 0 } ?: 1
             
             val request = PlantCreateRequest(
                 name = name,
                 userId = userId,
-                species = species
+                species = species,
+                location = location
             )
             
-            when (repository.createPlant(request)) {
+            when (plantRepository.createPlant(request)) {
                 is ApiResult.Success -> {
                     loadPlants() // Reload list
+                    loadStats()  // Reload stats
                 }
                 is ApiResult.Error -> {
                     _uiState.value = _uiState.value.copy(
@@ -90,12 +103,41 @@ class MyGardenViewModel : ViewModel() {
     
     fun waterPlant(plantId: Int) {
         viewModelScope.launch {
-            when (repository.waterPlant(plantId)) {
+            when (plantRepository.waterPlant(plantId)) {
                 is ApiResult.Success -> {
                     loadPlants() // Reload to get updated timestamp
                 }
                 else -> {}
             }
         }
+    }
+    
+    fun deletePlant(plantId: Int) {
+        viewModelScope.launch {
+            when (plantRepository.deletePlant(plantId)) {
+                is ApiResult.Success -> {
+                    loadPlants()
+                    loadStats()
+                }
+                is ApiResult.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        error = "Error al eliminar planta"
+                    )
+                }
+                else -> {}
+            }
+        }
+    }
+}
+
+class MyGardenViewModelFactory(
+    private val context: Context
+) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(MyGardenViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return MyGardenViewModel(context) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
     }
 }

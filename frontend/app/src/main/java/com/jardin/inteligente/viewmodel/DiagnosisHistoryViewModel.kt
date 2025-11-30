@@ -1,9 +1,13 @@
 package com.jardin.inteligente.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.jardin.inteligente.model.*
 import com.jardin.inteligente.network.ApiService
+import com.jardin.inteligente.repository.AuthRepository
+import com.jardin.inteligente.repository.DiagnosisRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,10 +19,13 @@ data class DiagnosisHistoryUiState(
     val error: String? = null
 )
 
-class DiagnosisHistoryViewModel : ViewModel() {
+/**
+ * ViewModel para historial de diagnósticos (CU-08)
+ */
+class DiagnosisHistoryViewModel(private val context: Context) : ViewModel() {
     
-    private val apiService = ApiService.getInstance()
-    private val userId = 1 // TODO: Get from auth
+    private val diagnosisRepository = DiagnosisRepository(context)
+    private val authRepository = AuthRepository(context)
     
     private val _uiState = MutableStateFlow(DiagnosisHistoryUiState())
     val uiState: StateFlow<DiagnosisHistoryUiState> = _uiState.asStateFlow()
@@ -31,25 +38,33 @@ class DiagnosisHistoryViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             
-            try {
-                val response = apiService.getDiagnosisHistory(userId)
-                if (response.isSuccessful && response.body() != null) {
+            when (val result = diagnosisRepository.getDiagnosisHistory()) {
+                is ApiResult.Success -> {
                     _uiState.value = _uiState.value.copy(
-                        diagnoses = response.body()!!.diagnoses,
-                        isLoading = false
-                    )
-                } else {
-                    _uiState.value = _uiState.value.copy(
-                        error = "Error al cargar historial",
+                        diagnoses = result.data.diagnoses,
                         isLoading = false
                     )
                 }
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    error = "Error de conexión: ${e.message}",
-                    isLoading = false
-                )
+                is ApiResult.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        error = result.message,
+                        isLoading = false
+                    )
+                }
+                else -> {}
             }
         }
+    }
+}
+
+class DiagnosisHistoryViewModelFactory(
+    private val context: Context
+) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(DiagnosisHistoryViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return DiagnosisHistoryViewModel(context) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
     }
 }
