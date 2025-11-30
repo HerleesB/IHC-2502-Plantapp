@@ -111,9 +111,10 @@ async def get_config():
 
 
 # Importar y registrar rutas
-from app.routes import diagnosis, plants, community, gamification
+from app.routes import diagnosis, plants, community, gamification, auth
 from app.models.database import init_db
 
+app.include_router(auth.router)
 app.include_router(diagnosis.router)
 app.include_router(plants.router)
 app.include_router(community.router)

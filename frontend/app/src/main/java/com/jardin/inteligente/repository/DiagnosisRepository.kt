@@ -3,127 +3,74 @@ package com.jardin.inteligente.repository
 import android.content.Context
 import android.net.Uri
 import android.util.Log
-import com.jardin.inteligente.model.ApiResult
-import com.jardin.inteligente.model.CaptureGuidanceResponse
+import com.jardin.inteligente.model.*
 import com.jardin.inteligente.network.ApiService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import java.io.FileOutputStream
 
-/**
- * Repository para operaciones de diagnóstico de plantas
- */
 class DiagnosisRepository(private val context: Context) {
     
     private val apiService = ApiService.getInstance()
-    private val TAG = "DiagnosisRepository"
+    private val userId = 1 // TODO: Get from auth
     
-    /**
-     * Validar foto capturada con IA
-     * 
-     * @param imageUri URI de la imagen capturada
-     * @return ApiResult con la respuesta de validación
-     */
-    suspend fun validateCapturedPhoto(imageUri: Uri): ApiResult<CaptureGuidanceResponse> {
-        return withContext(Dispatchers.IO) {
-            try {
-                Log.d(TAG, "Iniciando validación de foto: $imageUri")
-                
-                // Convertir URI a File
-                val imageFile = uriToFile(imageUri)
-                if (imageFile == null) {
-                    Log.e(TAG, "Error al convertir URI a archivo")
-                    return@withContext ApiResult.Error("No se pudo leer la imagen")
-                }
-                
-                Log.d(TAG, "Archivo de imagen: ${imageFile.name}, tamaño: ${imageFile.length()} bytes")
-                
-                // Validar tamaño (máx 10MB)
-                if (imageFile.length() > 10 * 1024 * 1024) {
-                    return@withContext ApiResult.Error("La imagen es demasiado grande. Máximo 10MB")
-                }
-                
-                // Crear RequestBody para multipart
-                val requestFile = imageFile.asRequestBody("image/*".toMediaTypeOrNull())
-                val imagePart = MultipartBody.Part.createFormData(
-                    "image",
-                    imageFile.name,
-                    requestFile
-                )
-                
-                Log.d(TAG, "Enviando request a API...")
-                
-                // Llamar a la API
-                val response = apiService.validateCapturedPhoto(imagePart)
-                
-                Log.d(TAG, "Response code: ${response.code()}")
-                
-                if (response.isSuccessful) {
-                    val body = response.body()
-                    if (body != null) {
-                        Log.d(TAG, "Validación exitosa: success=${body.success}, guidance=${body.guidance}")
-                        ApiResult.Success(body)
-                    } else {
-                        Log.e(TAG, "Response body es null")
-                        ApiResult.Error("Respuesta vacía del servidor")
-                    }
-                } else {
-                    val errorBody = response.errorBody()?.string() ?: "Error desconocido"
-                    Log.e(TAG, "Error del servidor: ${response.code()} - $errorBody")
-                    ApiResult.Error(
-                        message = parseErrorMessage(errorBody),
-                        code = response.code()
-                    )
-                }
-                
-            } catch (e: java.net.UnknownHostException) {
-                Log.e(TAG, "Error de conexión: No se puede conectar al servidor", e)
-                ApiResult.Error("No se puede conectar al servidor. Verifica tu conexión a internet y que el backend esté ejecutándose.")
-            } catch (e: java.net.SocketTimeoutException) {
-                Log.e(TAG, "Timeout de conexión", e)
-                ApiResult.Error("La conexión tardó demasiado. Intenta de nuevo.")
-            } catch (e: Exception) {
-                Log.e(TAG, "Error inesperado en validación", e)
-                ApiResult.Error("Error: ${e.localizedMessage ?: "Error desconocido"}")
+    suspend fun validatePhoto(imageUri: Uri): ApiResult<CaptureGuidanceResponse> = withContext(Dispatchers.IO) {
+        try {
+            val file = uriToFile(imageUri)
+            val requestFile = file.asRequestBody("image/*".toMediaTypeOrNull())
+            val imagePart = MultipartBody.Part.createFormData("image", file.name, requestFile)
+            
+            val response = apiService.validateCapturedPhoto(imagePart)
+            
+            if (response.isSuccessful && response.body() != null) {
+                ApiResult.Success(response.body()!!)
+            } else {
+                ApiResult.Error("Error al validar foto: ${response.code()}")
             }
+        } catch (e: Exception) {
+            Log.e("DiagnosisRepository", "Error validating photo", e)
+            ApiResult.Error("Error de conexión: ${e.message}")
         }
     }
     
-    /**
-     * Convierte URI a File temporal
-     */
-    private fun uriToFile(uri: Uri): File? {
-        return try {
-            val inputStream = context.contentResolver.openInputStream(uri)
-            val tempFile = File.createTempFile("temp_image", ".jpg", context.cacheDir)
+    suspend fun analyzePlant(
+        imageUri: Uri,
+        plantId: Int,
+        symptoms: String? = null
+    ): ApiResult<DiagnosisResponse> = withContext(Dispatchers.IO) {
+        try {
+            val file = uriToFile(imageUri)
+            val requestFile = file.asRequestBody("image/*".toMediaTypeOrNull())
+            val imagePart = MultipartBody.Part.createFormData("image", file.name, requestFile)
             
-            inputStream?.use { input ->
-                FileOutputStream(tempFile).use { output ->
-                    input.copyTo(output)
-                }
+            val plantIdBody = plantId.toString().toRequestBody("text/plain".toMediaTypeOrNull())
+            val userIdBody = userId.toString().toRequestBody("text/plain".toMediaTypeOrNull())
+            val symptomsBody = symptoms?.toRequestBody("text/plain".toMediaTypeOrNull())
+            
+            val response = apiService.analyzePlant(plantIdBody, imagePart, symptomsBody, userIdBody)
+            
+            if (response.isSuccessful && response.body() != null) {
+                ApiResult.Success(response.body()!!)
+            } else {
+                ApiResult.Error("Error en diagnóstico: ${response.code()}")
             }
-            
-            tempFile
         } catch (e: Exception) {
-            Log.e(TAG, "Error al convertir URI a archivo", e)
-            null
+            Log.e("DiagnosisRepository", "Error analyzing plant", e)
+            ApiResult.Error("Error de conexión: ${e.message}")
         }
     }
     
-    /**
-     * Parsear mensaje de error del servidor
-     */
-    private fun parseErrorMessage(errorBody: String): String {
-        return try {
-            // Intentar parsear JSON de error
-            val errorJson = com.google.gson.JsonParser.parseString(errorBody).asJsonObject
-            errorJson.get("detail")?.asString ?: "Error del servidor"
-        } catch (e: Exception) {
-            "Error del servidor"
+    private fun uriToFile(uri: Uri): File {
+        val inputStream = context.contentResolver.openInputStream(uri)
+        val file = File(context.cacheDir, "temp_${System.currentTimeMillis()}.jpg")
+        FileOutputStream(file).use { output ->
+            inputStream?.copyTo(output)
         }
+        return file
     }
 }

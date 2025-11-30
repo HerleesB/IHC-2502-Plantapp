@@ -117,7 +117,7 @@ async def get_plant_diagnosis(image_path: str, symptoms: str | None = None) -> D
         symptoms: Síntomas adicionales reportados por el usuario
     
     Returns:
-        Diccionario con diagnóstico completo
+        Diccionario con diagnóstico completo incluyendo weekly_plan
     """
     service = GroqService()
     
@@ -132,15 +132,17 @@ async def get_plant_diagnosis(image_path: str, symptoms: str | None = None) -> D
             "confidence": 0.0,
             "severity": "unknown",
             "disease_name": None,
-            "recommendations": []
+            "recommendations": [],
+            "weekly_plan": []
         }
     
     # Obtener prompt de diagnóstico
     prompt = DiagnosisPrompts.get_diagnosis_prompt()
     if symptoms:
-        prompt += f"\n\nSÍNTOMAS ADICIONALES REPORTADOS: {symptoms}"
+        prompt += f"\n\nSÍNTOMAS ADICIONALES REPORTADOS POR EL USUARIO: {symptoms}"
     
     # Analizar con Groq
+    logger.info(f"Iniciando diagnóstico completo desde {image_path}")
     result = await service.analyze_image_with_prompt(
         image_bytes=image_bytes,
         prompt=prompt,
@@ -149,75 +151,104 @@ async def get_plant_diagnosis(image_path: str, symptoms: str | None = None) -> D
     )
     
     if not result.get("success"):
-        logger.error(f"Fallo en análisis Groq: {result.get('error')}")
+        logger.error(f"Error en análisis de Groq: {result.get('error')}")
         return {
-            "diagnosis": "Error al procesar diagnóstico con IA",
+            "diagnosis": "Error al analizar la imagen. Por favor intenta nuevamente.",
             "confidence": 0.0,
             "severity": "unknown",
             "disease_name": None,
-            "recommendations": [
-                "Intenta tomar otra foto con mejor iluminación",
-                "Asegúrate de que la planta esté en foco"
-            ]
+            "recommendations": ["Intenta tomar otra foto con mejor iluminación"],
+            "weekly_plan": []
         }
     
-    # Parsear respuesta JSON de Groq
+    # Parsear respuesta JSON
     try:
-        # Limpiar respuesta (Groq a veces incluye markdown)
         content = result["content"]
         if "```json" in content:
             content = content.split("```json")[1].split("```")[0]
         elif "```" in content:
             content = content.split("```")[1].split("```")[0]
         
-        diagnosis_json = json.loads(content.strip())
+        diagnosis_data = json.loads(content.strip())
         
-        # Extraer información estructurada
-        issues = diagnosis_json.get("issues", [])
-        primary_issue = issues[0] if issues else {}
+        # Extraer información clave
+        species = diagnosis_data.get("species", {})
+        health_score = diagnosis_data.get("health_score", 50)
+        status = diagnosis_data.get("status", "warning")
+        issues = diagnosis_data.get("issues", [])
+        immediate_actions = diagnosis_data.get("immediate_actions", [])
+        summary = diagnosis_data.get("summary", "Diagnóstico completado")
         
-        immediate_actions = diagnosis_json.get("immediate_actions", [])
-        recommendations = [
-            action.get("action", "") 
-            for action in immediate_actions[:5]  # Top 5
-        ]
+        # Determinar severidad
+        if health_score >= 70:
+            severity = "healthy"
+        elif health_score >= 50:
+            severity = "warning"
+        else:
+            severity = "critical"
+        
+        # Obtener nombre de enfermedad principal
+        disease_name = None
+        if issues:
+            severe_issues = [i for i in issues if i.get("severity") == "high"]
+            disease_name = severe_issues[0].get("name") if severe_issues else issues[0].get("name")
+        
+        # Construir recomendaciones
+        recommendations = [action.get("action", "") for action in immediate_actions[:5]]
+        
+        # Generar plan semanal
+        weekly_plan = generate_weekly_plan(status, health_score, immediate_actions)
+        
+        logger.info(f"Diagnóstico completado: {severity}, health: {health_score}%")
         
         return {
-            "diagnosis": diagnosis_json.get("summary", "Diagnóstico completado"),
-            "confidence": diagnosis_json.get("species", {}).get("confidence", 0.75),
-            "severity": diagnosis_json.get("status", "warning"),
-            "disease_name": primary_issue.get("name", None),
-            "recommendations": recommendations if recommendations else [
-                "Monitorear la planta diariamente",
-                "Mantener buena iluminación indirecta",
-                "Verificar frecuencia de riego"
-            ]
+            "diagnosis": summary,
+            "confidence": species.get("confidence", 0.7),
+            "severity": severity,
+            "disease_name": disease_name,
+            "recommendations": recommendations if recommendations else ["Monitorear planta diariamente"],
+            "weekly_plan": weekly_plan
         }
         
     except json.JSONDecodeError as e:
-        logger.warning(f"Respuesta de Groq no es JSON válido: {e}")
-        # Si no es JSON válido, extraer info de texto plano
+        logger.error(f"Error parseando JSON: {e}")
         content = result["content"]
         return {
-            "diagnosis": content[:500] if len(content) > 500 else content,
-            "confidence": 0.7,
-            "severity": "medium",
-            "disease_name": "Diagnóstico general",
-            "recommendations": [
-                "Revisa el diagnóstico completo",
-                "Monitorea la planta regularmente",
-                "Asegura condiciones óptimas de luz y agua"
-            ]
-        }
-    except Exception as e:
-        logger.error(f"Error procesando respuesta de Groq: {e}")
-        return {
-            "diagnosis": "Error al procesar respuesta del análisis",
-            "confidence": 0.0,
-            "severity": "unknown",
+            "diagnosis": content[:500],
+            "confidence": 0.5,
+            "severity": "warning",
             "disease_name": None,
-            "recommendations": []
+            "recommendations": ["Consulta diagnóstico completo"],
+            "weekly_plan": []
         }
+
+
+def generate_weekly_plan(status: str, health_score: int, immediate_actions: list) -> list:
+    """
+    CU-03: Generar plan semanal accionable basado en severidad.
+    """
+    if status == "critical" or health_score < 30:
+        return [
+            {"day": "Hoy", "task": immediate_actions[0].get("action") if immediate_actions else "Aplicar tratamiento urgente", "priority": "high"},
+            {"day": "Mañana", "task": "Revisar progreso y síntomas", "priority": "high"},
+            {"day": "En 3 días", "task": "Segunda aplicación de tratamiento", "priority": "high"},
+            {"day": "En 5 días", "task": "Evaluar efectividad", "priority": "medium"},
+            {"day": "En 7 días", "task": "Fotografiar para comparar", "priority": "medium"}
+        ]
+    elif status == "warning" or health_score < 70:
+        return [
+            {"day": "Hoy", "task": immediate_actions[0].get("action") if immediate_actions else "Iniciar tratamiento", "priority": "medium"},
+            {"day": "En 2 días", "task": "Regar según recomendado", "priority": "medium"},
+            {"day": "En 4 días", "task": "Aplicar fertilizante", "priority": "low"},
+            {"day": "En 7 días", "task": "Monitoreo de progreso", "priority": "low"}
+        ]
+    else:
+        return [
+            {"day": "Lunes", "task": "Riego regular", "priority": "low"},
+            {"day": "Miércoles", "task": "Revisar hojas y tallo", "priority": "low"},
+            {"day": "Viernes", "task": "Fertilizar si corresponde", "priority": "low"},
+            {"day": "Domingo", "task": "Inspección general", "priority": "low"}
+        ]
 
 
 async def validate_photo_quality(image_bytes: bytes) -> Dict[str, Any]:

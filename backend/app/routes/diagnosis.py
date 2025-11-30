@@ -50,8 +50,8 @@ async def analyze_plant(
     db.commit()
     db.refresh(diagnosis)
     
-    # CU-03: Generar plan semanal
-    weekly_plan = generate_weekly_plan(diagnosis_data, plant)
+    # CU-03: Plan semanal ya viene incluido en el diagnóstico
+    weekly_plan = diagnosis_data.get("weekly_plan", [])
     
     return DiagnosisResponse(
         diagnosis_id=diagnosis.id,
@@ -122,7 +122,7 @@ async def get_capture_guidance(image: UploadFile = File(...)):
         logger.error(f"Error en validación de captura: {e}", exc_info=True)
         raise HTTPException(500, f"Error al validar la imagen: {str(e)}")
 
-@router.get("/{diagnosis_id}")
+@router.get("/")
 async def get_diagnosis(diagnosis_id: int, db: Session = Depends(get_db)):
     """Obtener diagnóstico por ID"""
     diagnosis = db.query(DiagnosisDB).filter(DiagnosisDB.id == diagnosis_id).first()
@@ -130,28 +130,40 @@ async def get_diagnosis(diagnosis_id: int, db: Session = Depends(get_db)):
         raise HTTPException(404, "Diagnóstico no encontrado")
     return diagnosis
 
-def generate_weekly_plan(diagnosis_data: dict, plant: PlantDB) -> list:
-    """CU-03: Generar plan semanal accionable"""
-    plan = []
-    severity = diagnosis_data["severity"]
+@router.get("/history/{user_id}")
+async def get_diagnosis_history(user_id: int, limit: int = 20, db: Session = Depends(get_db)):
+    """
+    CU-05: Obtener historial de diagnósticos del usuario.
     
-    if severity == "high" or severity == "critical":
-        plan = [
-            {"day": "Lunes", "task": "Aplicar tratamiento urgente", "priority": "high"},
-            {"day": "Miércoles", "task": "Revisar progreso", "priority": "high"},
-            {"day": "Viernes", "task": "Segunda aplicación de tratamiento", "priority": "high"},
-            {"day": "Domingo", "task": "Evaluación semanal", "priority": "medium"}
-        ]
-    elif severity == "medium" or severity == "warning":
-        plan = [
-            {"day": "Lunes", "task": "Iniciar tratamiento", "priority": "medium"},
-            {"day": "Jueves", "task": "Riego especial + fertilizante", "priority": "medium"},
-            {"day": "Domingo", "task": "Monitoreo de síntomas", "priority": "low"}
-        ]
-    else:  # healthy
-        plan = [
-            {"day": "Miércoles", "task": "Riego regular", "priority": "low"},
-            {"day": "Sábado", "task": "Inspección general", "priority": "low"}
-        ]
+    Args:
+        user_id: ID del usuario
+        limit: Número máximo de diagnósticos a retornar (default: 20)
     
-    return plan
+    Returns:
+        Lista de diagnósticos ordenados por fecha descendente
+    """
+    diagnoses = db.query(DiagnosisDB).filter(
+        DiagnosisDB.user_id == user_id
+    ).order_by(
+        DiagnosisDB.created_at.desc()
+    ).limit(limit).all()
+    
+    # Formatear respuesta con información de la planta
+    result = []
+    for diag in diagnoses:
+        plant = db.query(PlantDB).filter(PlantDB.id == diag.plant_id).first()
+        result.append({
+            "id": diag.id,
+            "plant_id": diag.plant_id,
+            "plant_name": plant.name if plant else "Desconocida",
+            "diagnosis_text": diag.diagnosis_text,
+            "disease_name": diag.disease_name,
+            "severity": diag.severity,
+            "confidence": diag.confidence,
+            "image_url": diag.image_url,
+            "recommendations": json.loads(diag.recommendations) if diag.recommendations else [],
+            "created_at": diag.created_at.isoformat()
+        })
+    
+    logger.info(f"Historial obtenido: {len(result)} diagnósticos para usuario {user_id}")
+    return {"diagnoses": result, "total": len(result)}

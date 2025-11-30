@@ -29,11 +29,11 @@ object ApiConfig {
     
     // ========== CONFIGURACIÓN - EDITA AQUÍ ==========
     
-    private const val USE_EMULATOR = false // true = emulador, false = dispositivo físico
+    private const val USE_EMULATOR = true // true = emulador, false = dispositivo físico
     
     // CAMBIA ESTA IP POR LA IP DE TU PC EN LA RED LOCAL
     // Para encontrarla: CMD > ipconfig > busca "Dirección IPv4"
-    private const val LOCAL_IP = "192.168.43.7" // 👈 CAMBIAR AQUÍ
+    private const val LOCAL_IP = "192.168.18.5" // 👈 CAMBIAR AQUÍ
     
     // =================================================
     
@@ -49,9 +49,9 @@ object ApiConfig {
     }
     
     // Timeouts (aumentados para dar más tiempo al análisis de IA)
-    const val CONNECT_TIMEOUT = 30L // segundos
-    const val READ_TIMEOUT = 30L // segundos - tiempo para esperar respuesta de IA
-    const val WRITE_TIMEOUT = 30L // segundos - tiempo para subir imagen
+    const val CONNECT_TIMEOUT = 60L // segundos
+    const val READ_TIMEOUT = 60L // segundos - tiempo para esperar respuesta de IA
+    const val WRITE_TIMEOUT = 60L // segundos - tiempo para subir imagen
     
     // Configuración
     const val ENABLE_LOGGING = true // Logs detallados de red (solo debug)
