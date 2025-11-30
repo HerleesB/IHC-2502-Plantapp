@@ -2,6 +2,17 @@ package com.jardin.inteligente.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
+// Primary colors
+val GreenPrimary = Color(0xFF16A34A)
+val GreenLight = Color(0xFFF0FDF4)
+val GreenDark = Color(0xFF14532D)
+
+// Status colors
+val YellowWarning = Color(0xFFFBBF24)
+val RedError = Color(0xFFEF4444)
+val BlueInfo = Color(0xFF2563EB)
+
+// Legacy colors
 val Green50 = Color(0xFFF0FDF4)
 val Green600 = Color(0xFF16A34A)
 val Green700 = Color(0xFF15803D)

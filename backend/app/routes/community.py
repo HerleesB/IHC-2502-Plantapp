@@ -73,3 +73,20 @@ async def add_comment(post_id: int, comment: CommentCreate, user_id: int = 1, db
     
     db.commit()
     return {"message": "Comentario agregado", "comment_id": db_comment.id}
+
+@router.post("/posts/{post_id}/like")
+async def toggle_like(post_id: int, db: Session = Depends(get_db)):
+    """Dar/quitar like a un post"""
+    post = db.query(CommunityPostDB).filter(CommunityPostDB.id == post_id).first()
+    if not post:
+        raise HTTPException(404, "Post no encontrado")
+    
+    post.likes += 1
+    db.commit()
+    return {"message": "Like agregado", "likes": post.likes}
+
+@router.get("/posts/{post_id}/comments")
+async def get_comments(post_id: int, db: Session = Depends(get_db)):
+    """Obtener comentarios de un post"""
+    comments = db.query(CommentDB).filter(CommentDB.post_id == post_id).order_by(CommentDB.created_at.desc()).all()
+    return [{"id": c.id, "user_id": c.user_id, "content": c.content, "is_solution": c.is_solution, "likes": c.likes, "created_at": c.created_at} for c in comments]

@@ -6,15 +6,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jardin.inteligente.model.ApiResult
 import com.jardin.inteligente.model.CaptureGuidanceResponse
+import com.jardin.inteligente.model.DiagnosisResponse
 import com.jardin.inteligente.repository.DiagnosisRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-/**
- * Estados posibles de la validación de foto
- */
 sealed class ValidationState {
     object Idle : ValidationState()
     object Loading : ValidationState()
@@ -22,76 +20,67 @@ sealed class ValidationState {
     data class Error(val message: String) : ValidationState()
 }
 
-/**
- * ViewModel para manejo de captura y validación de fotos
- */
+sealed class DiagnosisState {
+    object Idle : DiagnosisState()
+    object Loading : DiagnosisState()
+    data class Success(val response: DiagnosisResponse) : DiagnosisState()
+    data class Error(val message: String) : DiagnosisState()
+}
+
 class CaptureViewModel(context: Context) : ViewModel() {
     
     private val repository = DiagnosisRepository(context)
     
-    // Estado de validación
     private val _validationState = MutableStateFlow<ValidationState>(ValidationState.Idle)
     val validationState: StateFlow<ValidationState> = _validationState.asStateFlow()
     
-    // URI de la imagen capturada
+    private val _diagnosisState = MutableStateFlow<DiagnosisState>(DiagnosisState.Idle)
+    val diagnosisState: StateFlow<DiagnosisState> = _diagnosisState.asStateFlow()
+    
     private val _capturedImageUri = MutableStateFlow<Uri?>(null)
     val capturedImageUri: StateFlow<Uri?> = _capturedImageUri.asStateFlow()
     
-    /**
-     * Guardar URI de imagen capturada
-     */
     fun setCapturedImage(uri: Uri) {
         _capturedImageUri.value = uri
     }
     
-    /**
-     * Validar foto capturada con IA
-     */
     fun validatePhoto(imageUri: Uri) {
         viewModelScope.launch {
             _validationState.value = ValidationState.Loading
             
-            when (val result = repository.validateCapturedPhoto(imageUri)) {
+            when (val result = repository.validatePhoto(imageUri)) {
                 is ApiResult.Success -> {
                     _validationState.value = ValidationState.Success(result.data)
                 }
                 is ApiResult.Error -> {
                     _validationState.value = ValidationState.Error(result.message)
                 }
-                is ApiResult.Loading -> {
-                    // Ya está en Loading
-                }
+                else -> {}
             }
         }
     }
     
-    /**
-     * Resetear validación para nueva captura
-     */
-    fun resetValidation() {
-        _validationState.value = ValidationState.Idle
-        _capturedImageUri.value = null
+    fun analyzePlant(imageUri: Uri, plantId: Int, symptoms: String? = null) {
+        viewModelScope.launch {
+            _diagnosisState.value = DiagnosisState.Loading
+            
+            when (val result = repository.analyzePlant(imageUri, plantId, symptoms)) {
+                is ApiResult.Success -> {
+                    _diagnosisState.value = DiagnosisState.Success(result.data)
+                }
+                is ApiResult.Error -> {
+                    _diagnosisState.value = DiagnosisState.Error(result.message)
+                }
+                else -> {}
+            }
+        }
     }
     
-    /**
-     * Reintentar validación con la imagen actual
-     */
-    fun retryValidation() {
-        _capturedImageUri.value?.let { uri ->
-            validatePhoto(uri)
-        }
+    fun resetValidation() {
+        _validationState.value = ValidationState.Idle
     }
-}
-
-/**
- * Factory para crear CaptureViewModel con Context
- */
-class CaptureViewModelFactory(private val context: Context) : androidx.lifecycle.ViewModelProvider.Factory {
-    @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(CaptureViewModel::class.java)) {
-            return CaptureViewModel(context) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class")
+    
+    fun resetDiagnosis() {
+        _diagnosisState.value = DiagnosisState.Idle
     }
 }
