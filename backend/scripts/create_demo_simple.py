@@ -1,11 +1,12 @@
 """
 Script simple para crear usuario demo sin bcrypt
-Ejecutar: python create_demo_simple.py
+Ejecutar: python scripts/create_demo_simple.py
 """
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
+# Ajustar sys.path para importar desde directorio padre
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker

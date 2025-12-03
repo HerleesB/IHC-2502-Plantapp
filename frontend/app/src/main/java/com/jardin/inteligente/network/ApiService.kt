@@ -16,8 +16,10 @@ import java.util.concurrent.TimeUnit
  */
 interface ApiService {
     
+    // ========== DIAGNOSIS ENDPOINTS ==========
+    
     /**
-     * Validar calidad de foto capturada
+     * Validar calidad de foto capturada (CU-01)
      */
     @Multipart
     @POST("api/diagnosis/capture-guidance")
@@ -26,7 +28,7 @@ interface ApiService {
     ): Response<CaptureGuidanceResponse>
     
     /**
-     * Obtener diagnóstico completo de planta
+     * Obtener diagnóstico completo de planta (CU-02)
      */
     @Multipart
     @POST("api/diagnosis/analyze")
@@ -38,7 +40,7 @@ interface ApiService {
     ): Response<DiagnosisResponse>
     
     /**
-     * Obtener historial de diagnósticos
+     * Obtener historial de diagnósticos (CU-08)
      */
     @GET("api/diagnosis/history/{user_id}")
     suspend fun getDiagnosisHistory(
@@ -47,7 +49,27 @@ interface ApiService {
     ): Response<DiagnosisHistoryResponse>
     
     /**
-     * Obtener plantas del usuario
+     * Obtener historial de diagnósticos por planta (CU-08)
+     */
+    @GET("api/diagnosis/plant/{plant_id}/history")
+    suspend fun getDiagnosisHistoryByPlant(
+        @Path("plant_id") plantId: Int,
+        @Query("limit") limit: Int = 20
+    ): Response<List<DiagnosisHistoryItem>>
+    
+    /**
+     * Feedback/corrección del diagnóstico (CU-12)
+     */
+    @POST("api/diagnosis/{diagnosis_id}/feedback")
+    suspend fun submitDiagnosisFeedback(
+        @Path("diagnosis_id") diagnosisId: Int,
+        @Body feedback: DiagnosisFeedbackRequest
+    ): Response<Unit>
+    
+    // ========== PLANTS ENDPOINTS ==========
+    
+    /**
+     * Obtener plantas del usuario (CU-04, CU-16)
      */
     @GET("api/plants/user/{user_id}")
     suspend fun getUserPlants(
@@ -55,7 +77,15 @@ interface ApiService {
     ): Response<List<PlantResponse>>
     
     /**
-     * Crear nueva planta
+     * Obtener planta por ID (CU-08)
+     */
+    @GET("api/plants/{plant_id}")
+    suspend fun getPlantById(
+        @Path("plant_id") plantId: Int
+    ): Response<PlantResponse>
+    
+    /**
+     * Crear nueva planta (CU-04)
      */
     @POST("api/plants")
     suspend fun createPlant(
@@ -63,7 +93,38 @@ interface ApiService {
     ): Response<PlantResponse>
     
     /**
-     * Registrar riego de planta
+     * Crear planta con imagen desde diagnóstico (CU-20)
+     */
+    @Multipart
+    @POST("api/plants/with-diagnosis")
+    suspend fun createPlantWithDiagnosis(
+        @Part("name") name: RequestBody,
+        @Part("user_id") userId: RequestBody,
+        @Part("species") species: RequestBody?,
+        @Part("location") location: RequestBody?,
+        @Part("diagnosis_id") diagnosisId: RequestBody?,
+        @Part image: MultipartBody.Part?
+    ): Response<PlantResponse>
+    
+    /**
+     * Actualizar planta (CU-04)
+     */
+    @PUT("api/plants/{plant_id}")
+    suspend fun updatePlant(
+        @Path("plant_id") plantId: Int,
+        @Body plant: PlantUpdateRequest
+    ): Response<PlantResponse>
+    
+    /**
+     * Eliminar planta (CU-04)
+     */
+    @DELETE("api/plants/{plant_id}")
+    suspend fun deletePlant(
+        @Path("plant_id") plantId: Int
+    ): Response<Unit>
+    
+    /**
+     * Registrar riego de planta (CU-06)
      */
     @PUT("api/plants/{plant_id}/water")
     suspend fun waterPlant(
@@ -71,7 +132,7 @@ interface ApiService {
     ): Response<Unit>
     
     /**
-     * Obtener estadísticas de progreso
+     * Obtener estadísticas de progreso (CU-08)
      */
     @GET("api/plants/user/{user_id}/progress")
     suspend fun getProgressStats(
@@ -81,7 +142,7 @@ interface ApiService {
     // ========== COMMUNITY ENDPOINTS ==========
     
     /**
-     * Obtener posts de comunidad
+     * Obtener posts de comunidad (CU-19)
      */
     @GET("api/community/posts")
     suspend fun getCommunityPosts(
@@ -89,7 +150,7 @@ interface ApiService {
     ): Response<List<CommunityPostResponse>>
     
     /**
-     * Crear post en comunidad
+     * Crear post en comunidad (CU-07)
      */
     @POST("api/community/posts")
     suspend fun createCommunityPost(
@@ -98,7 +159,21 @@ interface ApiService {
     ): Response<CommunityPostResponse>
     
     /**
-     * Dar like a post
+     * Crear post con imagen directamente (CU-18)
+     */
+    @Multipart
+    @POST("api/community/posts/with-image")
+    suspend fun createCommunityPostWithImage(
+        @Part image: MultipartBody.Part,
+        @Part("description") description: RequestBody,
+        @Part("plant_name") plantName: RequestBody?,
+        @Part("symptoms") symptoms: RequestBody?,
+        @Part("is_anonymous") isAnonymous: RequestBody,
+        @Part("user_id") userId: RequestBody
+    ): Response<CommunityPostResponse>
+    
+    /**
+     * Dar like a post (CU-19)
      */
     @POST("api/community/posts/{post_id}/like")
     suspend fun likePost(
@@ -106,7 +181,7 @@ interface ApiService {
     ): Response<Unit>
     
     /**
-     * Obtener comentarios de un post
+     * Obtener comentarios de un post (CU-09)
      */
     @GET("api/community/posts/{post_id}/comments")
     suspend fun getPostComments(
@@ -114,7 +189,7 @@ interface ApiService {
     ): Response<List<CommentResponse>>
     
     /**
-     * Agregar comentario a post
+     * Agregar comentario a post (CU-09)
      */
     @POST("api/community/posts/{post_id}/comments")
     suspend fun addComment(
@@ -126,7 +201,7 @@ interface ApiService {
     // ========== GAMIFICATION ENDPOINTS ==========
     
     /**
-     * Obtener logros del usuario
+     * Obtener logros del usuario (CU-06, CU-17)
      */
     @GET("api/gamification/achievements/{user_id}")
     suspend fun getAchievements(
@@ -134,17 +209,51 @@ interface ApiService {
     ): Response<AchievementsResponse>
     
     /**
-     * Obtener misiones del usuario
+     * Obtener misiones del usuario (CU-06)
      */
     @GET("api/gamification/missions/{user_id}")
     suspend fun getMissions(
         @Path("user_id") userId: Int
     ): Response<MissionsResponse>
     
+    /**
+     * Obtener stats de gamificación (CU-17)
+     */
+    @GET("api/gamification/stats/{user_id}")
+    suspend fun getGamificationStats(
+        @Path("user_id") userId: Int
+    ): Response<GamificationStatsResponse>
+    
+    // ========== REMINDERS ENDPOINTS ==========
+    
+    /**
+     * Obtener recordatorios del usuario (CU-06)
+     */
+    @GET("api/reminders/user/{user_id}")
+    suspend fun getReminders(
+        @Path("user_id") userId: Int
+    ): Response<List<ReminderResponse>>
+    
+    /**
+     * Crear recordatorio (CU-06)
+     */
+    @POST("api/reminders")
+    suspend fun createReminder(
+        @Body reminder: ReminderCreateRequest
+    ): Response<ReminderResponse>
+    
+    /**
+     * Marcar recordatorio como completado (CU-06)
+     */
+    @PUT("api/reminders/{reminder_id}/complete")
+    suspend fun completeReminder(
+        @Path("reminder_id") reminderId: Int
+    ): Response<Unit>
+    
     // ========== AUTH ENDPOINTS ==========
     
     /**
-     * Registrar usuario
+     * Registrar usuario (CU-15)
      */
     @POST("api/auth/register")
     suspend fun register(
@@ -152,7 +261,7 @@ interface ApiService {
     ): Response<TokenResponse>
     
     /**
-     * Iniciar sesión
+     * Iniciar sesión (CU-15)
      */
     @POST("api/auth/login")
     suspend fun login(
@@ -160,19 +269,22 @@ interface ApiService {
     ): Response<TokenResponse>
     
     /**
-     * Obtener usuario actual
+     * Obtener usuario actual (CU-15)
      */
     @GET("api/auth/me")
     suspend fun getCurrentUser(
         @Header("Authorization") token: String
     ): Response<UserResponse>
     
+    /**
+     * Refrescar token
+     */
+    @POST("api/auth/refresh")
+    suspend fun refreshToken(
+        @Header("Authorization") token: String
+    ): Response<TokenResponse>
 
-    
     companion object {
-        /**
-         * Singleton para obtener instancia de ApiService
-         */
         private var instance: ApiService? = null
         
         fun getInstance(): ApiService {
@@ -182,11 +294,7 @@ interface ApiService {
             return instance!!
         }
         
-        /**
-         * Crear instancia de Retrofit con configuración
-         */
         private fun create(): ApiService {
-            // Logging interceptor para debug
             val loggingInterceptor = HttpLoggingInterceptor().apply {
                 level = if (ApiConfig.ENABLE_LOGGING) {
                     HttpLoggingInterceptor.Level.BODY
@@ -195,7 +303,6 @@ interface ApiService {
                 }
             }
             
-            // Cliente HTTP con configuración
             val client = OkHttpClient.Builder()
                 .addInterceptor(loggingInterceptor)
                 .connectTimeout(ApiConfig.CONNECT_TIMEOUT, TimeUnit.SECONDS)
@@ -204,7 +311,6 @@ interface ApiService {
                 .retryOnConnectionFailure(true)
                 .build()
             
-            // Retrofit
             val retrofit = Retrofit.Builder()
                 .baseUrl(ApiConfig.BASE_URL)
                 .client(client)

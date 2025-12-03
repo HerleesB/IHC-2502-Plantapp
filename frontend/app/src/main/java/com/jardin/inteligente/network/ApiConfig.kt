@@ -29,11 +29,11 @@ object ApiConfig {
     
     // ========== CONFIGURACIÓN - EDITA AQUÍ ==========
     
-    private const val USE_EMULATOR = true // true = emulador, false = dispositivo físico
+    private const val USE_EMULATOR = false // true = emulador, false = dispositivo físico
     
     // CAMBIA ESTA IP POR LA IP DE TU PC EN LA RED LOCAL
     // Para encontrarla: CMD > ipconfig > busca "Dirección IPv4"
-    private const val LOCAL_IP = "192.168.18.5" // 👈 CAMBIAR AQUÍ
+    private const val LOCAL_IP = "192.168.43.7" // 👈 CAMBIAR AQUÍ
     
     // =================================================
     

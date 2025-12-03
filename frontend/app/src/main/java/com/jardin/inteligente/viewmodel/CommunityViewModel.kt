@@ -1,10 +1,13 @@
 package com.jardin.inteligente.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.jardin.inteligente.model.*
 import com.jardin.inteligente.network.ApiService
 import com.jardin.inteligente.repository.CommunityRepository
+import com.jardin.inteligente.repository.AuthRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,9 +19,13 @@ data class CommunityUiState(
     val error: String? = null
 )
 
-class CommunityViewModel : ViewModel() {
+/**
+ * ViewModel para la Comunidad (CU-07, CU-19)
+ */
+class CommunityViewModel(private val context: Context) : ViewModel() {
     
     private val repository = CommunityRepository(ApiService.getInstance())
+    private val authRepository = AuthRepository(context)
     
     private val _uiState = MutableStateFlow(CommunityUiState())
     val uiState: StateFlow<CommunityUiState> = _uiState.asStateFlow()
@@ -83,5 +90,17 @@ class CommunityViewModel : ViewModel() {
                 else -> {}
             }
         }
+    }
+}
+
+class CommunityViewModelFactory(
+    private val context: Context
+) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(CommunityViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return CommunityViewModel(context) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
     }
 }

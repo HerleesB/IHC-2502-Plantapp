@@ -1,12 +1,13 @@
 """
 Script para crear posts de ejemplo en la comunidad
-Ejecutar: python create_community_posts.py
+Ejecutar: python scripts/create_community_posts.py
 """
 import sys
 from pathlib import Path
 from datetime import datetime, timedelta
 
-sys.path.insert(0, str(Path(__file__).parent))
+# Ajustar el path para importar desde el directorio padre
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sqlalchemy.orm import sessionmaker
 from app.models.database import engine, CommunityPostDB, CommentDB, UserDB
@@ -22,7 +23,7 @@ def create_sample_posts():
         demo_user = session.query(UserDB).filter(UserDB.username == "demo").first()
         if not demo_user:
             print("❌ Usuario demo no existe.")
-            print("   Ejecuta primero: python create_demo_simple.py")
+            print("   Ejecuta primero: python scripts/create_demo_simple.py")
             return
         
         user_id = demo_user.id
