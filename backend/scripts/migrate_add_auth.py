@@ -1,12 +1,12 @@
 """
 Script de migración para agregar autenticación
-Ejecutar: python migrate_add_auth.py
+Ejecutar: python scripts/migrate_add_auth.py
 """
 import sys
 from pathlib import Path
 
-# Agregar el directorio app al path
-sys.path.insert(0, str(Path(__file__).parent))
+# Ajustar sys.path para importar desde directorio padre
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker

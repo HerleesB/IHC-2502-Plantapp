@@ -2,33 +2,30 @@
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from app.models.database import get_db, UserDB
 import os
+import hashlib
 
 # Configuración de seguridad
 SECRET_KEY = os.getenv("SECRET_KEY", "tu-clave-secreta-super-segura-cambiar-en-produccion")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 días
 
-# Contexto para hash de contraseñas
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 # Security scheme para FastAPI
 security = HTTPBearer()
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verifica que la contraseña plana coincida con el hash"""
-    return pwd_context.verify(plain_password, hashed_password)
+    """Verifica que la contraseña plana coincida con el hash SHA256"""
+    return hashlib.sha256(plain_password.encode()).hexdigest() == hashed_password
 
 
 def get_password_hash(password: str) -> str:
-    """Genera un hash bcrypt de la contraseña"""
-    return pwd_context.hash(password)
+    """Genera un hash SHA256 de la contraseña"""
+    return hashlib.sha256(password.encode()).hexdigest()
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
