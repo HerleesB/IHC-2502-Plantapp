@@ -3,6 +3,7 @@ package com.jardin.inteligente.viewmodel
 import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.jardin.inteligente.model.ApiResult
 import com.jardin.inteligente.model.CaptureGuidanceResponse
@@ -27,6 +28,9 @@ sealed class DiagnosisState {
     data class Error(val message: String) : DiagnosisState()
 }
 
+/**
+ * ViewModel para captura y diagnóstico (CU-01, CU-02, CU-14, CU-20)
+ */
 class CaptureViewModel(context: Context) : ViewModel() {
     
     private val repository = DiagnosisRepository(context)
@@ -42,6 +46,9 @@ class CaptureViewModel(context: Context) : ViewModel() {
     
     fun setCapturedImage(uri: Uri) {
         _capturedImageUri.value = uri
+        // Reset states when new image is captured
+        _validationState.value = ValidationState.Idle
+        _diagnosisState.value = DiagnosisState.Idle
     }
     
     fun validatePhoto(imageUri: Uri) {
@@ -82,5 +89,11 @@ class CaptureViewModel(context: Context) : ViewModel() {
     
     fun resetDiagnosis() {
         _diagnosisState.value = DiagnosisState.Idle
+    }
+    
+    fun resetStates() {
+        _validationState.value = ValidationState.Idle
+        _diagnosisState.value = DiagnosisState.Idle
+        _capturedImageUri.value = null
     }
 }

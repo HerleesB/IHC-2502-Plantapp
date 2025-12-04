@@ -17,7 +17,7 @@ import java.io.FileOutputStream
 class DiagnosisRepository(private val context: Context) {
     
     private val apiService = ApiService.getInstance()
-    private val userId = 1 // TODO: Get from auth
+    private val authRepository = AuthRepository(context)
     
     suspend fun validatePhoto(imageUri: Uri): ApiResult<CaptureGuidanceResponse> = withContext(Dispatchers.IO) {
         try {
@@ -44,6 +44,8 @@ class DiagnosisRepository(private val context: Context) {
         symptoms: String? = null
     ): ApiResult<DiagnosisResponse> = withContext(Dispatchers.IO) {
         try {
+            val userId = authRepository.getUserId().takeIf { it > 0 } ?: 1
+            
             val file = uriToFile(imageUri)
             val requestFile = file.asRequestBody("image/*".toMediaTypeOrNull())
             val imagePart = MultipartBody.Part.createFormData("image", file.name, requestFile)
@@ -61,6 +63,74 @@ class DiagnosisRepository(private val context: Context) {
             }
         } catch (e: Exception) {
             Log.e("DiagnosisRepository", "Error analyzing plant", e)
+            ApiResult.Error("Error de conexión: ${e.message}")
+        }
+    }
+    
+    /**
+     * Obtener historial de diagnósticos del usuario (CU-08)
+     */
+    suspend fun getDiagnosisHistory(limit: Int = 20): ApiResult<DiagnosisHistoryResponse> = withContext(Dispatchers.IO) {
+        try {
+            val userId = authRepository.getUserId().takeIf { it > 0 } ?: 1
+            val response = apiService.getDiagnosisHistory(userId, limit)
+            
+            if (response.isSuccessful && response.body() != null) {
+                ApiResult.Success(response.body()!!)
+            } else {
+                ApiResult.Error("Error al obtener historial: ${response.code()}")
+            }
+        } catch (e: Exception) {
+            Log.e("DiagnosisRepository", "Error getting history", e)
+            ApiResult.Error("Error de conexión: ${e.message}")
+        }
+    }
+    
+    /**
+     * Obtener historial de diagnósticos por planta (CU-08)
+     */
+    suspend fun getDiagnosisHistoryByPlant(plantId: Int, limit: Int = 20): ApiResult<List<DiagnosisHistoryItem>> = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.getDiagnosisHistoryByPlant(plantId, limit)
+            
+            if (response.isSuccessful && response.body() != null) {
+                ApiResult.Success(response.body()!!)
+            } else {
+                // Si no hay endpoint específico, devolver lista vacía
+                ApiResult.Success(emptyList())
+            }
+        } catch (e: Exception) {
+            Log.e("DiagnosisRepository", "Error getting plant history", e)
+            // Devolver lista vacía si hay error
+            ApiResult.Success(emptyList())
+        }
+    }
+    
+    /**
+     * Enviar feedback sobre un diagnóstico (CU-12)
+     */
+    suspend fun submitFeedback(
+        diagnosisId: Int,
+        isCorrect: Boolean,
+        correctDiagnosis: String? = null,
+        feedbackText: String? = null
+    ): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val request = DiagnosisFeedbackRequest(
+                isCorrect = isCorrect,
+                correctDiagnosis = correctDiagnosis,
+                feedbackText = feedbackText
+            )
+            
+            val response = apiService.submitDiagnosisFeedback(diagnosisId, request)
+            
+            if (response.isSuccessful) {
+                ApiResult.Success(Unit)
+            } else {
+                ApiResult.Error("Error al enviar feedback: ${response.code()}")
+            }
+        } catch (e: Exception) {
+            Log.e("DiagnosisRepository", "Error submitting feedback", e)
             ApiResult.Error("Error de conexión: ${e.message}")
         }
     }

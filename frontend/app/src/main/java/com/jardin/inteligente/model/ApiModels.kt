@@ -1,6 +1,7 @@
 package com.jardin.inteligente.model
 
 import com.google.gson.annotations.SerializedName
+import java.io.Serializable
 
 /**
  * DTOs (Data Transfer Objects) para comunicación con la API
@@ -9,13 +10,13 @@ import com.google.gson.annotations.SerializedName
 // ========== REQUEST MODELS ==========
 
 data class CaptureGuidanceRequest(
-    val image: String // Base64 encoded image o se usa Multipart
+    val image: String
 )
 
 // ========== RESPONSE MODELS ==========
 
 /**
- * Respuesta de validación de captura de foto
+ * Respuesta de validación de captura de foto (CU-01)
  */
 data class CaptureGuidanceResponse(
     @SerializedName("step")
@@ -35,7 +36,7 @@ data class CaptureGuidanceResponse(
 )
 
 /**
- * Respuesta de diagnóstico completo
+ * Respuesta de diagnóstico completo (CU-02)
  */
 data class DiagnosisResponse(
     @SerializedName("diagnosis_id")
@@ -61,10 +62,10 @@ data class DiagnosisResponse(
     
     @SerializedName("audio_url")
     val audioUrl: String? = null
-)
+) : Serializable
 
 /**
- * Tarea semanal del plan de cuidado
+ * Tarea semanal del plan de cuidado (CU-03)
  */
 data class WeeklyTask(
     @SerializedName("day")
@@ -75,7 +76,7 @@ data class WeeklyTask(
     
     @SerializedName("priority")
     val priority: String
-)
+) : Serializable
 
 /**
  * Respuesta genérica de error de la API
@@ -86,7 +87,7 @@ data class ApiError(
 )
 
 /**
- * Planta
+ * Planta (CU-04, CU-08, CU-16)
  */
 data class PlantResponse(
     @SerializedName("id")
@@ -116,10 +117,16 @@ data class PlantResponse(
     @SerializedName("last_fertilized")
     val lastFertilized: String?,
     
+    @SerializedName("location")
+    val location: String? = null,
+    
     @SerializedName("created_at")
     val createdAt: String
 )
 
+/**
+ * Request para crear planta (CU-04, CU-20)
+ */
 data class PlantCreateRequest(
     @SerializedName("name")
     val name: String,
@@ -131,11 +138,31 @@ data class PlantCreateRequest(
     val species: String? = null,
     
     @SerializedName("description")
-    val description: String? = null
+    val description: String? = null,
+    
+    @SerializedName("location")
+    val location: String? = null,
+    
+    @SerializedName("diagnosis_id")
+    val diagnosisId: Int? = null
+)
+
+data class PlantUpdateRequest(
+    @SerializedName("name")
+    val name: String? = null,
+    
+    @SerializedName("species")
+    val species: String? = null,
+    
+    @SerializedName("description")
+    val description: String? = null,
+    
+    @SerializedName("location")
+    val location: String? = null
 )
 
 /**
- * Historial de diagnósticos
+ * Historial de diagnósticos (CU-08)
  */
 data class DiagnosisHistoryResponse(
     @SerializedName("diagnoses")
@@ -178,7 +205,21 @@ data class DiagnosisHistoryItem(
 )
 
 /**
- * Estadísticas de progreso
+ * Feedback de diagnóstico (CU-12)
+ */
+data class DiagnosisFeedbackRequest(
+    @SerializedName("is_correct")
+    val isCorrect: Boolean,
+    
+    @SerializedName("correct_diagnosis")
+    val correctDiagnosis: String? = null,
+    
+    @SerializedName("feedback_text")
+    val feedbackText: String? = null
+)
+
+/**
+ * Estadísticas de progreso (CU-08)
  */
 data class ProgressStatsResponse(
     @SerializedName("total_plants")
@@ -204,7 +245,7 @@ data class ProgressStatsResponse(
 )
 
 /**
- * Comunidad - Posts
+ * Comunidad - Posts (CU-07, CU-18, CU-19)
  */
 data class CommunityPostResponse(
     @SerializedName("id")
@@ -217,7 +258,7 @@ data class CommunityPostResponse(
     val userId: Int,
     
     @SerializedName("author_name")
-    val authorName: String,
+    val authorName: String?,
     
     @SerializedName("is_anonymous")
     val isAnonymous: Boolean,
@@ -230,6 +271,18 @@ data class CommunityPostResponse(
     
     @SerializedName("status")
     val status: String,
+    
+    @SerializedName("description")
+    val description: String? = null,
+    
+    @SerializedName("plant_name")
+    val plantName: String? = null,
+    
+    @SerializedName("symptoms")
+    val symptoms: String? = null,
+    
+    @SerializedName("image_url")
+    val imageUrl: String? = null,
     
     @SerializedName("created_at")
     val createdAt: String
@@ -249,6 +302,9 @@ data class CommentResponse(
     
     @SerializedName("user_id")
     val userId: Int,
+    
+    @SerializedName("author_name")
+    val authorName: String? = null,
     
     @SerializedName("content")
     val content: String,
@@ -272,7 +328,7 @@ data class CommentCreateRequest(
 )
 
 /**
- * Gamificación
+ * Gamificación (CU-06, CU-17)
  */
 data class AchievementResponse(
     @SerializedName("id")
@@ -297,7 +353,10 @@ data class AchievementResponse(
     val progress: Int,
     
     @SerializedName("progress_max")
-    val progressMax: Int
+    val progressMax: Int,
+    
+    @SerializedName("unlocked_at")
+    val unlockedAt: String? = null
 )
 
 data class AchievementsResponse(
@@ -339,6 +398,9 @@ data class MissionResponse(
     @SerializedName("progress")
     val progress: Int,
     
+    @SerializedName("target")
+    val target: Int = 1,
+    
     @SerializedName("completed")
     val completed: Boolean
 )
@@ -363,8 +425,80 @@ data class MissionsResponse(
     val nextLevelXp: Int
 )
 
+data class GamificationStatsResponse(
+    @SerializedName("level")
+    val level: Int,
+    
+    @SerializedName("xp")
+    val xp: Int,
+    
+    @SerializedName("next_level_xp")
+    val nextLevelXp: Int,
+    
+    @SerializedName("total_points")
+    val totalPoints: Int,
+    
+    @SerializedName("streak_days")
+    val streakDays: Int,
+    
+    @SerializedName("unlocked_achievements")
+    val unlockedAchievements: Int,
+    
+    @SerializedName("total_achievements")
+    val totalAchievements: Int,
+    
+    @SerializedName("completed_missions")
+    val completedMissions: Int
+)
+
 /**
- * Autenticación
+ * Recordatorios (CU-06)
+ */
+data class ReminderResponse(
+    @SerializedName("id")
+    val id: Int,
+    
+    @SerializedName("plant_id")
+    val plantId: Int,
+    
+    @SerializedName("plant_name")
+    val plantName: String,
+    
+    @SerializedName("reminder_type")
+    val reminderType: String,
+    
+    @SerializedName("message")
+    val message: String,
+    
+    @SerializedName("scheduled_time")
+    val scheduledTime: String,
+    
+    @SerializedName("completed")
+    val completed: Boolean,
+    
+    @SerializedName("created_at")
+    val createdAt: String
+)
+
+data class ReminderCreateRequest(
+    @SerializedName("plant_id")
+    val plantId: Int,
+    
+    @SerializedName("user_id")
+    val userId: Int,
+    
+    @SerializedName("reminder_type")
+    val reminderType: String,
+    
+    @SerializedName("message")
+    val message: String,
+    
+    @SerializedName("scheduled_time")
+    val scheduledTime: String
+)
+
+/**
+ * Autenticación (CU-15)
  */
 data class UserResponse(
     @SerializedName("id")

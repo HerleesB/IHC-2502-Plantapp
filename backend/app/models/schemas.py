@@ -51,20 +51,29 @@ class PlantStatus(str, Enum):
     healthy = "healthy"
     warning = "warning"
     critical = "critical"
+    needs_attention = "needs_attention"
 
 class PlantBase(BaseModel):
     name: str
     species: Optional[str] = None
     description: Optional[str] = None
     image_url: Optional[str] = None
+    location: Optional[str] = None
 
 class PlantCreate(PlantBase):
     user_id: int
+    diagnosis_id: Optional[int] = None
+
+class PlantUpdate(BaseModel):
+    name: Optional[str] = None
+    species: Optional[str] = None
+    description: Optional[str] = None
+    location: Optional[str] = None
 
 class Plant(PlantBase):
     id: int
     user_id: int
-    status: PlantStatus = PlantStatus.healthy
+    status: str = "healthy"
     health_score: int = 100
     last_watered: Optional[datetime] = None
     last_fertilized: Optional[datetime] = None
@@ -95,6 +104,11 @@ class Diagnosis(BaseModel):
     class Config:
         from_attributes = True
 
+class DiagnosisFeedback(BaseModel):
+    is_correct: bool
+    correct_diagnosis: Optional[str] = None
+    feedback_text: Optional[str] = None
+
 # ========== PLAN SEMANAL ==========
 class WeeklyTask(BaseModel):
     id: int
@@ -112,14 +126,19 @@ class WeeklyPlan(BaseModel):
 # ========== RECORDATORIOS ==========
 class ReminderCreate(BaseModel):
     plant_id: int
+    user_id: int
     reminder_type: str
     scheduled_time: datetime
     message: str
 
-class Reminder(ReminderCreate):
+class Reminder(BaseModel):
     id: int
+    plant_id: int
     user_id: int
-    sent: bool = False
+    reminder_type: str
+    message: str
+    scheduled_time: datetime
+    completed: bool = False
     created_at: datetime
 
 # ========== GAMIFICACIÓN ==========
@@ -157,21 +176,23 @@ class CommunityPost(BaseModel):
     is_anonymous: bool
     likes: int = 0
     comments_count: int = 0
-    status: str  # pending, resolved
+    status: str  # pending, resolved, approved
     created_at: datetime
     
     class Config:
         from_attributes = True
 
 class CommentCreate(BaseModel):
-    post_id: int
     content: str
     is_solution: bool = False
 
-class Comment(CommentCreate):
+class Comment(BaseModel):
     id: int
+    post_id: int
     user_id: int
-    author_name: str
+    content: str
+    author_name: Optional[str] = None
+    is_solution: bool = False
     likes: int = 0
     created_at: datetime
 
@@ -183,8 +204,12 @@ class DiagnosisResponse(BaseModel):
     confidence: float
     severity: str
     recommendations: List[str]
-    weekly_plan: List[dict]
+    weekly_plan: List[dict] = []
     audio_url: Optional[str] = None
+    # Nuevos campos para comunicación adaptativa (Mejora #2)
+    user_level: Optional[str] = None
+    level_badge: Optional[str] = None
+    educational_tips: List[str] = []
 
 class CaptureGuidance(BaseModel):
     step: str

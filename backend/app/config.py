@@ -9,8 +9,11 @@ class Settings(BaseSettings):
     Configuración de la aplicación usando variables de entorno
     """
     
-    # API Keys - REQUERIDO
-    GROQ_API_KEY: str = Field(..., description="API Key de Groq")
+    # API Keys - REQUERIDO (con valor por defecto para desarrollo)
+    GROQ_API_KEY: str = Field(
+        default="",
+        description="API Key de Groq - Obtén una en https://console.groq.com/"
+    )
 
     # Configuración de la aplicación
     APP_NAME: str = Field(default="Jardín Inteligente API")
