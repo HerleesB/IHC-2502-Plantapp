@@ -12,12 +12,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.jardin.inteligente.model.ApiResult
 import com.jardin.inteligente.model.DiagnosisResponse
 import com.jardin.inteligente.model.WeeklyTask
+import com.jardin.inteligente.repository.DiagnosisRepository
 import com.jardin.inteligente.ui.theme.*
+import kotlinx.coroutines.launch
 
 /**
  * CU-02, CU-03, CU-12: Pantalla de detalle de diagnóstico con recomendaciones
@@ -31,8 +35,30 @@ fun DiagnosisDetailScreen(
     onAddToGarden: () -> Unit = {},
     onShareToCommunity: (Int) -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val repository = remember { DiagnosisRepository(context) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    
     var showFeedbackDialog by remember { mutableStateOf(false) }
     var showShareDialog by remember { mutableStateOf(false) }
+    
+    // Estado del feedback
+    var hasFeedback by remember { mutableStateOf(false) }
+    var existingFeedbackIsCorrect by remember { mutableStateOf<Boolean?>(null) }
+    var isLoadingFeedback by remember { mutableStateOf(false) }
+    var feedbackSent by remember { mutableStateOf(false) }
+    
+    // Cargar estado de feedback existente al iniciar
+    LaunchedEffect(diagnosis.diagnosisId) {
+        when (val result = repository.getUserFeedback(diagnosis.diagnosisId)) {
+            is ApiResult.Success -> {
+                hasFeedback = result.data.hasFeedback
+                existingFeedbackIsCorrect = result.data.feedback?.isCorrect
+            }
+            else -> {}
+        }
+    }
     
     Scaffold(
         topBar = {
@@ -55,7 +81,8 @@ fun DiagnosisDetailScreen(
                     }
                 }
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -244,42 +271,111 @@ fun DiagnosisDetailScreen(
             // Feedback section (CU-12)
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5))
+                colors = CardDefaults.cardColors(
+                    containerColor = when {
+                        hasFeedback && existingFeedbackIsCorrect == true -> GreenPrimary.copy(alpha = 0.1f)
+                        hasFeedback && existingFeedbackIsCorrect == false -> RedError.copy(alpha = 0.1f)
+                        else -> Color(0xFFF5F5F5)
+                    }
+                )
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Feedback, null, tint = BlueInfo)
+                        Icon(
+                            imageVector = when {
+                                hasFeedback && existingFeedbackIsCorrect == true -> Icons.Default.CheckCircle
+                                hasFeedback && existingFeedbackIsCorrect == false -> Icons.Default.Cancel
+                                else -> Icons.Default.Feedback
+                            },
+                            contentDescription = null,
+                            tint = when {
+                                hasFeedback && existingFeedbackIsCorrect == true -> GreenPrimary
+                                hasFeedback && existingFeedbackIsCorrect == false -> RedError
+                                else -> BlueInfo
+                            }
+                        )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "¿Es correcto este diagnóstico?",
+                            text = when {
+                                hasFeedback && existingFeedbackIsCorrect == true -> "Marcado como correcto ✅"
+                                hasFeedback && existingFeedbackIsCorrect == false -> "Marcado como incorrecto ❌"
+                                else -> "¿Es correcto este diagnóstico?"
+                            },
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Medium
                         )
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "Tu feedback nos ayuda a mejorar la precisión del diagnóstico.",
+                        text = if (hasFeedback) 
+                            "¡Gracias por tu feedback! Puedes cambiarlo si lo deseas."
+                        else 
+                            "Tu feedback nos ayuda a mejorar la precisión del diagnóstico.",
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.Gray
                     )
                     Spacer(modifier = Modifier.height(12.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(
-                            onClick = { showFeedbackDialog = true },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Default.ThumbDown, null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Incorrecto")
-                        }
-                        Button(
-                            onClick = { /* TODO: Send positive feedback */ },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary)
-                        ) {
-                            Icon(Icons.Default.ThumbUp, null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Correcto")
+                    
+                    if (isLoadingFeedback) {
+                        LinearProgressIndicator(
+                            modifier = Modifier.fillMaxWidth(),
+                            color = GreenPrimary
+                        )
+                    } else {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(
+                                onClick = { showFeedbackDialog = true },
+                                modifier = Modifier.weight(1f),
+                                colors = if (hasFeedback && existingFeedbackIsCorrect == false)
+                                    ButtonDefaults.outlinedButtonColors(containerColor = RedError.copy(alpha = 0.1f))
+                                else
+                                    ButtonDefaults.outlinedButtonColors()
+                            ) {
+                                Icon(Icons.Default.ThumbDown, null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Incorrecto")
+                            }
+                            Button(
+                                onClick = {
+                                    // Enviar feedback positivo
+                                    scope.launch {
+                                        isLoadingFeedback = true
+                                        when (val result = repository.submitFeedback(
+                                            diagnosisId = diagnosis.diagnosisId,
+                                            isCorrect = true,
+                                            correctDiagnosis = null,
+                                            feedbackText = null
+                                        )) {
+                                            is ApiResult.Success -> {
+                                                hasFeedback = true
+                                                existingFeedbackIsCorrect = true
+                                                feedbackSent = true
+                                                snackbarHostState.showSnackbar(
+                                                    message = result.data.message,
+                                                    duration = SnackbarDuration.Short
+                                                )
+                                            }
+                                            is ApiResult.Error -> {
+                                                snackbarHostState.showSnackbar(
+                                                    message = "Error: ${result.message}",
+                                                    duration = SnackbarDuration.Short
+                                                )
+                                            }
+                                            else -> {}
+                                        }
+                                        isLoadingFeedback = false
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = if (hasFeedback && existingFeedbackIsCorrect == true)
+                                    ButtonDefaults.buttonColors(containerColor = GreenPrimary)
+                                else
+                                    ButtonDefaults.buttonColors(containerColor = GreenPrimary)
+                            ) {
+                                Icon(Icons.Default.ThumbUp, null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Correcto")
+                            }
                         }
                     }
                 }
@@ -332,9 +428,12 @@ fun DiagnosisDetailScreen(
     if (showFeedbackDialog) {
         var feedbackText by remember { mutableStateOf("") }
         var correctDiagnosis by remember { mutableStateOf("") }
+        var isSendingFeedback by remember { mutableStateOf(false) }
         
         AlertDialog(
-            onDismissRequest = { showFeedbackDialog = false },
+            onDismissRequest = { 
+                if (!isSendingFeedback) showFeedbackDialog = false 
+            },
             icon = {
                 Icon(Icons.Default.Feedback, null, tint = BlueInfo)
             },
@@ -350,30 +449,77 @@ fun DiagnosisDetailScreen(
                         onValueChange = { correctDiagnosis = it },
                         label = { Text("Diagnóstico correcto") },
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
+                        singleLine = true,
+                        enabled = !isSendingFeedback
                     )
                     OutlinedTextField(
                         value = feedbackText,
                         onValueChange = { feedbackText = it },
                         label = { Text("Comentarios adicionales (opcional)") },
                         modifier = Modifier.fillMaxWidth(),
-                        maxLines = 3
+                        maxLines = 3,
+                        enabled = !isSendingFeedback
                     )
+                    
+                    if (isSendingFeedback) {
+                        LinearProgressIndicator(
+                            modifier = Modifier.fillMaxWidth(),
+                            color = GreenPrimary
+                        )
+                    }
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        // TODO: Send feedback
-                        showFeedbackDialog = false
+                        scope.launch {
+                            isSendingFeedback = true
+                            when (val result = repository.submitFeedback(
+                                diagnosisId = diagnosis.diagnosisId,
+                                isCorrect = false,
+                                correctDiagnosis = correctDiagnosis.ifBlank { null },
+                                feedbackText = feedbackText.ifBlank { null }
+                            )) {
+                                is ApiResult.Success -> {
+                                    hasFeedback = true
+                                    existingFeedbackIsCorrect = false
+                                    feedbackSent = true
+                                    showFeedbackDialog = false
+                                    snackbarHostState.showSnackbar(
+                                        message = result.data.message,
+                                        duration = SnackbarDuration.Short
+                                    )
+                                }
+                                is ApiResult.Error -> {
+                                    snackbarHostState.showSnackbar(
+                                        message = "Error: ${result.message}",
+                                        duration = SnackbarDuration.Short
+                                    )
+                                }
+                                else -> {}
+                            }
+                            isSendingFeedback = false
+                        }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary)
+                    colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary),
+                    enabled = !isSendingFeedback
                 ) {
-                    Text("Enviar Feedback")
+                    if (isSendingFeedback) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text("Enviar Feedback")
+                    }
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showFeedbackDialog = false }) {
+                TextButton(
+                    onClick = { showFeedbackDialog = false },
+                    enabled = !isSendingFeedback
+                ) {
                     Text("Cancelar")
                 }
             }

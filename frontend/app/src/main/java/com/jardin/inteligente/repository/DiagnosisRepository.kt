@@ -114,24 +114,49 @@ class DiagnosisRepository(private val context: Context) {
         isCorrect: Boolean,
         correctDiagnosis: String? = null,
         feedbackText: String? = null
-    ): ApiResult<Unit> = withContext(Dispatchers.IO) {
+    ): ApiResult<FeedbackResponse> = withContext(Dispatchers.IO) {
         try {
+            val userId = authRepository.getUserId().takeIf { it > 0 } ?: 1
+            
             val request = DiagnosisFeedbackRequest(
                 isCorrect = isCorrect,
                 correctDiagnosis = correctDiagnosis,
                 feedbackText = feedbackText
             )
             
-            val response = apiService.submitDiagnosisFeedback(diagnosisId, request)
+            val response = apiService.submitDiagnosisFeedback(diagnosisId, request, userId)
             
-            if (response.isSuccessful) {
-                ApiResult.Success(Unit)
+            if (response.isSuccessful && response.body() != null) {
+                Log.d("DiagnosisRepository", "Feedback enviado exitosamente: ${response.body()!!.message}")
+                ApiResult.Success(response.body()!!)
             } else {
                 ApiResult.Error("Error al enviar feedback: ${response.code()}")
             }
         } catch (e: Exception) {
             Log.e("DiagnosisRepository", "Error submitting feedback", e)
             ApiResult.Error("Error de conexión: ${e.message}")
+        }
+    }
+    
+    /**
+     * Verificar si el usuario ya envió feedback para un diagnóstico (CU-12)
+     */
+    suspend fun getUserFeedback(diagnosisId: Int): ApiResult<UserFeedbackResponse> = withContext(Dispatchers.IO) {
+        try {
+            val userId = authRepository.getUserId().takeIf { it > 0 } ?: 1
+            
+            val response = apiService.getUserFeedbackForDiagnosis(diagnosisId, userId)
+            
+            if (response.isSuccessful && response.body() != null) {
+                ApiResult.Success(response.body()!!)
+            } else {
+                // Si hay error, asumimos que no hay feedback
+                ApiResult.Success(UserFeedbackResponse(hasFeedback = false, feedback = null))
+            }
+        } catch (e: Exception) {
+            Log.e("DiagnosisRepository", "Error getting user feedback", e)
+            // En caso de error, devolver que no hay feedback
+            ApiResult.Success(UserFeedbackResponse(hasFeedback = false, feedback = null))
         }
     }
     

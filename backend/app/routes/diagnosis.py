@@ -417,32 +417,67 @@ async def submit_diagnosis_feedback(
     user_id: int = 1,
     db: Session = Depends(get_db)
 ):
-    """CU-12: Feedback/corrección del diagnóstico (Active Learning)"""
+    """CU-12: Feedback/corrección del diagnóstico (Active Learning)
+    
+    - Solo se permite UN feedback por usuario por diagnóstico
+    - Si ya existe feedback, se actualiza en lugar de crear uno nuevo
+    """
     diagnosis = db.query(DiagnosisDB).filter(DiagnosisDB.id == diagnosis_id).first()
     if not diagnosis:
         raise HTTPException(404, "Diagnóstico no encontrado")
     
     try:
-        db_feedback = DiagnosisFeedbackDB(
-            diagnosis_id=diagnosis_id,
-            user_id=user_id,
-            is_correct=feedback.is_correct,
-            correct_diagnosis=feedback.correct_diagnosis,
-            feedback_text=feedback.feedback_text
-        )
-        db.add(db_feedback)
+        # Verificar si ya existe feedback de este usuario para este diagnóstico
+        existing_feedback = db.query(DiagnosisFeedbackDB).filter(
+            DiagnosisFeedbackDB.diagnosis_id == diagnosis_id,
+            DiagnosisFeedbackDB.user_id == user_id
+        ).first()
         
-        if not feedback.is_correct and feedback.correct_diagnosis:
-            logger.info(f"Diagnóstico {diagnosis_id} marcado para corrección: {feedback.correct_diagnosis}")
-        
-        db.commit()
-        db.refresh(db_feedback)
-        
-        return {
-            "message": "Feedback recibido. ¡Gracias por ayudarnos a mejorar!",
-            "feedback_id": db_feedback.id,
-            "is_correct": feedback.is_correct
-        }
+        if existing_feedback:
+            # Actualizar feedback existente
+            existing_feedback.is_correct = feedback.is_correct
+            existing_feedback.correct_diagnosis = feedback.correct_diagnosis
+            existing_feedback.feedback_text = feedback.feedback_text
+            existing_feedback.created_at = datetime.utcnow()  # Actualizar timestamp
+            
+            db.commit()
+            db.refresh(existing_feedback)
+            
+            logger.info(f"Feedback actualizado para diagnóstico {diagnosis_id} por usuario {user_id}")
+            
+            return {
+                "success": True,
+                "message": "Feedback actualizado. ¡Gracias por tu corrección!",
+                "feedback_id": existing_feedback.id,
+                "is_correct": feedback.is_correct,
+                "updated": True
+            }
+        else:
+            # Crear nuevo feedback
+            db_feedback = DiagnosisFeedbackDB(
+                diagnosis_id=diagnosis_id,
+                user_id=user_id,
+                is_correct=feedback.is_correct,
+                correct_diagnosis=feedback.correct_diagnosis,
+                feedback_text=feedback.feedback_text
+            )
+            db.add(db_feedback)
+            
+            if not feedback.is_correct and feedback.correct_diagnosis:
+                logger.info(f"Diagnóstico {diagnosis_id} marcado para corrección: {feedback.correct_diagnosis}")
+            
+            db.commit()
+            db.refresh(db_feedback)
+            
+            logger.info(f"Nuevo feedback creado para diagnóstico {diagnosis_id} por usuario {user_id}")
+            
+            return {
+                "success": True,
+                "message": "Feedback recibido. ¡Gracias por ayudarnos a mejorar!",
+                "feedback_id": db_feedback.id,
+                "is_correct": feedback.is_correct,
+                "updated": False
+            }
         
     except Exception as e:
         db.rollback()
@@ -450,9 +485,39 @@ async def submit_diagnosis_feedback(
         raise HTTPException(500, f"Error al guardar feedback: {str(e)}")
 
 
+@router.get("/{diagnosis_id}/feedback/user/{user_id}")
+async def get_user_feedback_for_diagnosis(
+    diagnosis_id: int,
+    user_id: int,
+    db: Session = Depends(get_db)
+):
+    """Verificar si un usuario ya envió feedback para un diagnóstico específico"""
+    feedback = db.query(DiagnosisFeedbackDB).filter(
+        DiagnosisFeedbackDB.diagnosis_id == diagnosis_id,
+        DiagnosisFeedbackDB.user_id == user_id
+    ).first()
+    
+    if feedback:
+        return {
+            "has_feedback": True,
+            "feedback": {
+                "id": feedback.id,
+                "is_correct": feedback.is_correct,
+                "correct_diagnosis": feedback.correct_diagnosis,
+                "feedback_text": feedback.feedback_text,
+                "created_at": feedback.created_at.isoformat()
+            }
+        }
+    else:
+        return {
+            "has_feedback": False,
+            "feedback": None
+        }
+
+
 @router.get("/{diagnosis_id}/feedback")
 async def get_diagnosis_feedback(diagnosis_id: int, db: Session = Depends(get_db)):
-    """Obtener feedback de un diagnóstico específico"""
+    """Obtener todos los feedbacks de un diagnóstico específico"""
     feedbacks = db.query(DiagnosisFeedbackDB).filter(
         DiagnosisFeedbackDB.diagnosis_id == diagnosis_id
     ).all()

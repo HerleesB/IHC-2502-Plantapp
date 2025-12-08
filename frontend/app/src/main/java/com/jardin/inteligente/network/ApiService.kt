@@ -63,8 +63,18 @@ interface ApiService {
     @POST("api/diagnosis/{diagnosis_id}/feedback")
     suspend fun submitDiagnosisFeedback(
         @Path("diagnosis_id") diagnosisId: Int,
-        @Body feedback: DiagnosisFeedbackRequest
-    ): Response<Unit>
+        @Body feedback: DiagnosisFeedbackRequest,
+        @Query("user_id") userId: Int = 1
+    ): Response<FeedbackResponse>
+    
+    /**
+     * Verificar si el usuario ya envió feedback para un diagnóstico (CU-12)
+     */
+    @GET("api/diagnosis/{diagnosis_id}/feedback/user/{user_id}")
+    suspend fun getUserFeedbackForDiagnosis(
+        @Path("diagnosis_id") diagnosisId: Int,
+        @Path("user_id") userId: Int
+    ): Response<UserFeedbackResponse>
     
     // ========== PLANTS ENDPOINTS ==========
     
