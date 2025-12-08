@@ -219,6 +219,54 @@ data class DiagnosisFeedbackRequest(
 )
 
 /**
+ * Respuesta de enviar feedback (CU-12)
+ */
+data class FeedbackResponse(
+    @SerializedName("success")
+    val success: Boolean,
+    
+    @SerializedName("message")
+    val message: String,
+    
+    @SerializedName("feedback_id")
+    val feedbackId: Int,
+    
+    @SerializedName("is_correct")
+    val isCorrect: Boolean,
+    
+    @SerializedName("updated")
+    val updated: Boolean = false
+)
+
+/**
+ * Respuesta de verificación de feedback de usuario (CU-12)
+ */
+data class UserFeedbackResponse(
+    @SerializedName("has_feedback")
+    val hasFeedback: Boolean,
+    
+    @SerializedName("feedback")
+    val feedback: ExistingFeedback? = null
+)
+
+data class ExistingFeedback(
+    @SerializedName("id")
+    val id: Int,
+    
+    @SerializedName("is_correct")
+    val isCorrect: Boolean,
+    
+    @SerializedName("correct_diagnosis")
+    val correctDiagnosis: String? = null,
+    
+    @SerializedName("feedback_text")
+    val feedbackText: String? = null,
+    
+    @SerializedName("created_at")
+    val createdAt: String
+)
+
+/**
  * Estadísticas de progreso (CU-08)
  */
 data class ProgressStatsResponse(
