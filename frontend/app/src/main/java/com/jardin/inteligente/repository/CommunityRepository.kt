@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import com.jardin.inteligente.model.*
+import com.jardin.inteligente.network.ApiConfig
 import com.jardin.inteligente.network.ApiService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -20,7 +21,13 @@ class CommunityRepository(private val apiService: ApiService) {
         try {
             val response = apiService.getCommunityPosts(limit)
             if (response.isSuccessful && response.body() != null) {
-                ApiResult.Success(response.body()!!)
+                // Procesar posts para agregar URL base a las imágenes
+                val postsWithFullImageUrl = response.body()!!.map { post ->
+                    post.copy(
+                        imageUrl = buildFullImageUrl(post.imageUrl)
+                    )
+                }
+                ApiResult.Success(postsWithFullImageUrl)
             } else {
                 ApiResult.Error("Error al obtener posts: ${response.code()}")
             }
@@ -28,6 +35,25 @@ class CommunityRepository(private val apiService: ApiService) {
             Log.e("CommunityRepository", "Error getting posts", e)
             ApiResult.Error("Error de conexión: ${e.message}")
         }
+    }
+    
+    /**
+     * Construir URL completa para la imagen
+     * Convierte rutas relativas como "uploads/community/xxx.jpg" 
+     * a URLs completas como "http://192.168.18.5:8000/uploads/community/xxx.jpg"
+     */
+    private fun buildFullImageUrl(imageUrl: String?): String? {
+        if (imageUrl.isNullOrBlank()) return null
+        
+        // Si ya es una URL completa, retornarla tal cual
+        if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
+            return imageUrl
+        }
+        
+        // Construir URL completa usando la BASE_URL de ApiConfig
+        val baseUrl = ApiConfig.BASE_URL.trimEnd('/')
+        val path = imageUrl.trimStart('/')
+        return "$baseUrl/$path"
     }
     
     suspend fun createPost(diagnosisId: Int, isAnonymous: Boolean = false): ApiResult<CommunityPostResponse> = withContext(Dispatchers.IO) {
@@ -85,7 +111,11 @@ class CommunityRepository(private val apiService: ApiService) {
             )
             
             if (response.isSuccessful && response.body() != null) {
-                ApiResult.Success(response.body()!!)
+                // Procesar la respuesta para agregar URL base a la imagen
+                val postWithFullImageUrl = response.body()!!.copy(
+                    imageUrl = buildFullImageUrl(response.body()!!.imageUrl)
+                )
+                ApiResult.Success(postWithFullImageUrl)
             } else {
                 ApiResult.Error("Error al crear post: ${response.code()}")
             }
