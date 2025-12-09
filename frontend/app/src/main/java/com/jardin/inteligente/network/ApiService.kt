@@ -130,8 +130,9 @@ interface ApiService {
      */
     @DELETE("api/plants/{plant_id}")
     suspend fun deletePlant(
-        @Path("plant_id") plantId: Int
-    ): Response<Unit>
+        @Path("plant_id") plantId: Int,
+        @Query("user_id") userId: Int
+    ): Response<DeletePlantResponse>
     
     /**
      * Registrar riego de planta (CU-06)

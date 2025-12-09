@@ -1,5 +1,7 @@
 package com.jardin.inteligente.ui.screens
 
+import android.speech.tts.TextToSpeech
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -15,12 +17,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.jardin.inteligente.model.PlantResponse
 import com.jardin.inteligente.viewmodel.MyGardenViewModel
 import com.jardin.inteligente.viewmodel.MyGardenViewModelFactory
 import com.jardin.inteligente.ui.theme.*
+import kotlinx.coroutines.launch
+import java.util.Locale
 
 /**
  * CU-04, CU-16: Pantalla Mi Jardín - Gestión de plantas y visualización dinámica
@@ -36,7 +42,35 @@ fun MyGardenScreen(
         factory = MyGardenViewModelFactory(context)
     )
     val uiState by viewModel.uiState.collectAsState()
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    
     var showAddPlantDialog by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var plantToDelete by remember { mutableStateOf<PlantResponse?>(null) }
+    var isDeleting by remember { mutableStateOf(false) }
+    
+    // TTS para accesibilidad
+    var tts by remember { mutableStateOf<TextToSpeech?>(null) }
+    var ttsReady by remember { mutableStateOf(false) }
+    
+    DisposableEffect(Unit) {
+        tts = TextToSpeech(context) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                tts?.language = Locale("es", "ES")
+                ttsReady = true
+            }
+        }
+        onDispose {
+            tts?.shutdown()
+        }
+    }
+    
+    fun speak(text: String) {
+        if (ttsReady) {
+            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
+        }
+    }
     
     Scaffold(
         topBar = {
@@ -55,7 +89,8 @@ fun MyGardenScreen(
                     }
                 }
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             when {
@@ -134,7 +169,13 @@ fun MyGardenScreen(
                                 plant = plant,
                                 onCardClick = { onNavigateToPlantDetail(plant.id) },
                                 onWaterClick = { viewModel.waterPlant(plant.id) },
-                                onDiagnosisClick = { onNavigateToDiagnosis(plant.id) }
+                                onDiagnosisClick = { onNavigateToDiagnosis(plant.id) },
+                                onDeleteClick = {
+                                    plantToDelete = plant
+                                    showDeleteDialog = true
+                                    // Reproducir alerta de voz
+                                    speak("¿Estás seguro que deseas eliminar la planta ${plant.name}?")
+                                }
                             )
                         }
                     }
@@ -143,6 +184,7 @@ fun MyGardenScreen(
         }
     }
     
+    // Diálogo para agregar planta
     if (showAddPlantDialog) {
         AddPlantDialog(
             onDismiss = { showAddPlantDialog = false },
@@ -152,6 +194,184 @@ fun MyGardenScreen(
             }
         )
     }
+    
+    // Diálogo de confirmación para eliminar planta
+    if (showDeleteDialog && plantToDelete != null) {
+        DeletePlantConfirmationDialog(
+            plantName = plantToDelete!!.name,
+            isDeleting = isDeleting,
+            onConfirm = {
+                scope.launch {
+                    isDeleting = true
+                    speak("Eliminando planta ${plantToDelete!!.name}")
+                    
+                    val success = viewModel.deletePlant(plantToDelete!!.id)
+                    
+                    isDeleting = false
+                    showDeleteDialog = false
+                    
+                    if (success) {
+                        speak("Planta eliminada correctamente")
+                        snackbarHostState.showSnackbar(
+                            message = "Planta \"${plantToDelete!!.name}\" eliminada correctamente",
+                            duration = SnackbarDuration.Short
+                        )
+                    } else {
+                        speak("Error al eliminar la planta")
+                        snackbarHostState.showSnackbar(
+                            message = "Error al eliminar la planta",
+                            duration = SnackbarDuration.Short
+                        )
+                    }
+                    plantToDelete = null
+                }
+            },
+            onDismiss = {
+                if (!isDeleting) {
+                    showDeleteDialog = false
+                    plantToDelete = null
+                    speak("Cancelado")
+                }
+            }
+        )
+    }
+}
+
+/**
+ * Diálogo de confirmación para eliminar planta con diseño robusto
+ */
+@Composable
+fun DeletePlantConfirmationDialog(
+    plantName: String,
+    isDeleting: Boolean,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = { if (!isDeleting) onDismiss() },
+        icon = {
+            Icon(
+                Icons.Default.Warning,
+                contentDescription = null,
+                tint = RedError,
+                modifier = Modifier.size(48.dp)
+            )
+        },
+        title = {
+            Text(
+                text = "¿Eliminar planta?",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+        },
+        text = {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Estás a punto de eliminar:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.Gray
+                )
+                
+                // Nombre de la planta destacado
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = RedError.copy(alpha = 0.1f)
+                    )
+                ) {
+                    Text(
+                        text = "\"$plantName\"",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        color = RedError
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Advertencia
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = YellowWarning.copy(alpha = 0.1f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Icon(
+                            Icons.Default.Info,
+                            contentDescription = null,
+                            tint = YellowWarning,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Esta acción eliminará permanentemente la planta y todo su historial de diagnósticos.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.Gray
+                        )
+                    }
+                }
+                
+                if (isDeleting) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    LinearProgressIndicator(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = RedError
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                enabled = !isDeleting,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = RedError
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (isDeleting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Eliminando...")
+                } else {
+                    Icon(Icons.Default.Delete, null, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Sí, eliminar planta")
+                }
+            }
+        },
+        dismissButton = {
+            OutlinedButton(
+                onClick = onDismiss,
+                enabled = !isDeleting,
+                modifier = Modifier.fillMaxWidth(),
+                border = BorderStroke(2.dp, GreenPrimary),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = GreenPrimary
+                )
+            ) {
+                Icon(Icons.Default.Close, null, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Cancelar", fontWeight = FontWeight.Bold)
+            }
+        }
+    )
 }
 
 @Composable
@@ -231,10 +451,11 @@ fun StatItem(icon: androidx.compose.ui.graphics.vector.ImageVector, label: Strin
 
 @Composable
 fun PlantCard(
-    plant: com.jardin.inteligente.model.PlantResponse,
+    plant: PlantResponse,
     onCardClick: () -> Unit,
     onWaterClick: () -> Unit,
-    onDiagnosisClick: () -> Unit
+    onDiagnosisClick: () -> Unit,
+    onDeleteClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -243,34 +464,59 @@ fun PlantCard(
         elevation = CardDefaults.cardElevation(4.dp)
     ) {
         Column {
-            // Image
-            if (plant.imageUrl != null) {
-                AsyncImage(
-                    model = plant.imageUrl,
-                    contentDescription = plant.name,
+            // Image with delete button overlay
+            Box {
+                if (plant.imageUrl != null) {
+                    AsyncImage(
+                        model = plant.imageUrl,
+                        contentDescription = plant.name,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(180.dp)
+                            .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp)
+                            .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Surface(
+                            color = GreenLight,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Default.LocalFlorist,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(48.dp),
+                                    tint = GreenPrimary
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                // Botón de eliminar en la esquina superior derecha
+                IconButton(
+                    onClick = onDeleteClick,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(180.dp)
-                        .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(120.dp)
-                        .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
-                    contentAlignment = Alignment.Center
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
                 ) {
                     Surface(
-                        color = GreenLight,
-                        modifier = Modifier.fillMaxSize()
+                        shape = RoundedCornerShape(50),
+                        color = Color.Black.copy(alpha = 0.5f),
+                        modifier = Modifier.size(36.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
-                                Icons.Default.LocalFlorist,
-                                contentDescription = null,
-                                modifier = Modifier.size(48.dp),
-                                tint = GreenPrimary
+                                Icons.Default.Delete,
+                                contentDescription = "Eliminar planta",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }

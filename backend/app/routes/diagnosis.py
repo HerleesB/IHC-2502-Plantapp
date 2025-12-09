@@ -105,7 +105,7 @@ async def analyze_plant(
     
     logger.info(f"Diagnóstico guardado con ID: {diagnosis.id}, imagen: {diagnosis.image_url}")
     
-    # Actualizar health_score de la planta si existe
+    # Actualizar health_score e imagen de la planta si existe
     if plant_id > 0:
         plant = db.query(PlantDB).filter(PlantDB.id == plant_id).first()
         if plant:
@@ -113,6 +113,11 @@ async def analyze_plant(
             severity_scores = {"low": 80, "medium": 50, "high": 25, "critical": 10}
             new_score = severity_scores.get(diagnosis_data["severity"].lower(), 70)
             plant.health_score = int((plant.health_score + new_score) / 2)  # Promedio
+            
+            # Actualizar la imagen de la planta con la nueva imagen del diagnóstico
+            plant.image_url = image_path
+            logger.info(f"Imagen de planta {plant_id} actualizada a: {image_path}")
+            
             db.commit()
     
     # CU-03: Plan semanal ya viene incluido en el diagnóstico

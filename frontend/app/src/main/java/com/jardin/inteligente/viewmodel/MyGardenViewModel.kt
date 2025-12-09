@@ -112,20 +112,26 @@ class MyGardenViewModel(private val context: Context) : ViewModel() {
         }
     }
     
-    fun deletePlant(plantId: Int) {
-        viewModelScope.launch {
-            when (plantRepository.deletePlant(plantId)) {
-                is ApiResult.Success -> {
-                    loadPlants()
-                    loadStats()
-                }
-                is ApiResult.Error -> {
-                    _uiState.value = _uiState.value.copy(
-                        error = "Error al eliminar planta"
-                    )
-                }
-                else -> {}
+    /**
+     * Eliminar planta con confirmación
+     * @return true si se eliminó exitosamente, false si hubo error
+     */
+    suspend fun deletePlant(plantId: Int): Boolean {
+        val userId = authRepository.getUserId().takeIf { it > 0 } ?: 1
+        
+        return when (val result = plantRepository.deletePlant(plantId, userId)) {
+            is ApiResult.Success -> {
+                loadPlants()
+                loadStats()
+                true
             }
+            is ApiResult.Error -> {
+                _uiState.value = _uiState.value.copy(
+                    error = "Error al eliminar planta: ${result.message}"
+                )
+                false
+            }
+            else -> false
         }
     }
 }
