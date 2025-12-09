@@ -140,16 +140,37 @@ class CommunityRepository(private val apiService: ApiService) {
         }
     }
     
-    suspend fun likePost(postId: Int): ApiResult<Unit> = withContext(Dispatchers.IO) {
+    /**
+     * Toggle like en un post (dar o quitar like)
+     * Retorna LikeResponse con el estado actual del like
+     */
+    suspend fun toggleLikePost(postId: Int, userId: Int = 1): ApiResult<LikeResponse> = withContext(Dispatchers.IO) {
         try {
-            val response = apiService.likePost(postId)
-            if (response.isSuccessful) {
-                ApiResult.Success(Unit)
+            val response = apiService.toggleLikePost(postId, userId)
+            if (response.isSuccessful && response.body() != null) {
+                ApiResult.Success(response.body()!!)
             } else {
-                ApiResult.Error("Error al dar like: ${response.code()}")
+                ApiResult.Error("Error al dar/quitar like: ${response.code()}")
             }
         } catch (e: Exception) {
-            Log.e("CommunityRepository", "Error liking post", e)
+            Log.e("CommunityRepository", "Error toggling like", e)
+            ApiResult.Error("Error de conexión: ${e.message}")
+        }
+    }
+    
+    /**
+     * Verificar si el usuario dio like a un post
+     */
+    suspend fun checkUserLikedPost(postId: Int, userId: Int): ApiResult<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.checkUserLikedPost(postId, userId)
+            if (response.isSuccessful && response.body() != null) {
+                ApiResult.Success(response.body()!!.liked)
+            } else {
+                ApiResult.Error("Error al verificar like: ${response.code()}")
+            }
+        } catch (e: Exception) {
+            Log.e("CommunityRepository", "Error checking like", e)
             ApiResult.Error("Error de conexión: ${e.message}")
         }
     }
@@ -168,10 +189,10 @@ class CommunityRepository(private val apiService: ApiService) {
         }
     }
     
-    suspend fun addComment(postId: Int, content: String, isSolution: Boolean = false): ApiResult<Unit> = withContext(Dispatchers.IO) {
+    suspend fun addComment(postId: Int, content: String, isSolution: Boolean = false, userId: Int = 1): ApiResult<Unit> = withContext(Dispatchers.IO) {
         try {
             val request = CommentCreateRequest(content, isSolution)
-            val response = apiService.addComment(postId, request)
+            val response = apiService.addComment(postId, request, userId)
             if (response.isSuccessful) {
                 ApiResult.Success(Unit)
             } else {
