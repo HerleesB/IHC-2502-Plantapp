@@ -41,6 +41,9 @@ sealed class Screen(val route: String) {
     }
     object Community : Screen("community")
     object CommunityShare : Screen("community_share")
+    object PostDetail : Screen("post_detail/{postId}") {
+        fun createRoute(postId: Int) = "post_detail/$postId"
+    }
     object History : Screen("history")
     object PlantDetail : Screen("plant_detail/{plantId}") {
         fun createRoute(plantId: Int) = "plant_detail/$plantId"
@@ -321,6 +324,9 @@ fun MainScreen() {
                             navController.navigate("community_share")
                         }
                     },
+                    onNavigateToPostDetail = { postId ->
+                        navController.navigate(Screen.PostDetail.createRoute(postId))
+                    },
                     onLoginRequired = {
                         navController.navigate("login")
                     }
@@ -344,6 +350,21 @@ fun MainScreen() {
                         }
                     )
                 }
+            }
+            
+            // Nueva ruta para detalle del post
+            composable(
+                route = "post_detail/{postId}",
+                arguments = listOf(navArgument("postId") { type = NavType.IntType })
+            ) { backStackEntry ->
+                showBottomBar = false
+                val postId = backStackEntry.arguments?.getInt("postId") ?: 0
+                PostDetailScreen(
+                    postId = postId,
+                    isGuestMode = isGuestMode,
+                    onNavigateBack = { navController.popBackStack() },
+                    onLoginRequired = { navController.navigate("login") }
+                )
             }
             
             composable("history") {

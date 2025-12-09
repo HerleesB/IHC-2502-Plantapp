@@ -184,12 +184,23 @@ interface ApiService {
     ): Response<CommunityPostResponse>
     
     /**
-     * Dar like a post (CU-19)
+     * Toggle like en un post - dar o quitar like (CU-19)
      */
+    @FormUrlEncoded
     @POST("api/community/posts/{post_id}/like")
-    suspend fun likePost(
-        @Path("post_id") postId: Int
-    ): Response<Unit>
+    suspend fun toggleLikePost(
+        @Path("post_id") postId: Int,
+        @Field("user_id") userId: Int = 1
+    ): Response<LikeResponse>
+    
+    /**
+     * Verificar si el usuario dio like a un post (CU-19)
+     */
+    @GET("api/community/posts/{post_id}/liked-by/{user_id}")
+    suspend fun checkUserLikedPost(
+        @Path("post_id") postId: Int,
+        @Path("user_id") userId: Int
+    ): Response<CheckLikedResponse>
     
     /**
      * Obtener comentarios de un post (CU-09)

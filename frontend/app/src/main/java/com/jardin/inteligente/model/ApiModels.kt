@@ -393,6 +393,31 @@ data class CommentCreateRequest(
 )
 
 /**
+ * Respuesta de toggle like (CU-19)
+ */
+data class LikeResponse(
+    @SerializedName("success")
+    val success: Boolean,
+    
+    @SerializedName("message")
+    val message: String,
+    
+    @SerializedName("liked")
+    val liked: Boolean,
+    
+    @SerializedName("total_likes")
+    val totalLikes: Int
+)
+
+/**
+ * Respuesta de verificar si usuario dio like (CU-19)
+ */
+data class CheckLikedResponse(
+    @SerializedName("liked")
+    val liked: Boolean
+)
+
+/**
  * Gamificación (CU-06, CU-17)
  */
 data class AchievementResponse(

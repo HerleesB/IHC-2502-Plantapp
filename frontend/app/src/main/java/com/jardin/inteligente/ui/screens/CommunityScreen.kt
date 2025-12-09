@@ -1,5 +1,6 @@
 package com.jardin.inteligente.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -7,6 +8,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,19 +22,21 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.jardin.inteligente.model.CommentResponse
 import com.jardin.inteligente.model.CommunityPostResponse
 import com.jardin.inteligente.ui.theme.*
 import com.jardin.inteligente.viewmodel.CommunityViewModel
 import com.jardin.inteligente.viewmodel.CommunityViewModelFactory
 
 /**
- * CU-07, CU-19: Pantalla de Comunidad - Feed de posts y compartir
+ * CU-07, CU-09, CU-19: Pantalla de Comunidad - Feed de posts, comentarios y compartir
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CommunityScreen(
     isGuestMode: Boolean = false,
     onNavigateToShare: () -> Unit = {},
+    onNavigateToPostDetail: (Int) -> Unit = {},
     onLoginRequired: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -41,6 +45,10 @@ fun CommunityScreen(
     )
     val uiState by viewModel.uiState.collectAsState()
     var showLoginDialog by remember { mutableStateOf(false) }
+    
+    // Estado para el diálogo de comentarios
+    var showCommentsDialog by remember { mutableStateOf(false) }
+    var selectedPostForComments by remember { mutableStateOf<CommunityPostResponse?>(null) }
     
     Scaffold(
         topBar = {
@@ -181,22 +189,31 @@ fun CommunityScreen(
                         }
                         
                         items(uiState.posts) { post ->
+                            // Obtener si el usuario dio like a este post
+                            val isLiked = uiState.userLikes[post.id] ?: false
+                            
                             CommunityPostCard(
                                 post = post,
+                                isLiked = isLiked,
                                 isGuestMode = isGuestMode,
                                 onLike = { 
                                     if (isGuestMode) {
                                         showLoginDialog = true
                                     } else {
-                                        viewModel.likePost(post.id)
+                                        viewModel.toggleLikePost(post.id)
                                     }
                                 },
                                 onComment = { 
                                     if (isGuestMode) {
                                         showLoginDialog = true
                                     } else {
-                                        // TODO: Navigate to comments
+                                        selectedPostForComments = post
+                                        viewModel.loadComments(post.id)
+                                        showCommentsDialog = true
                                     }
+                                },
+                                onViewDetails = {
+                                    onNavigateToPostDetail(post.id)
                                 }
                             )
                         }
@@ -204,6 +221,29 @@ fun CommunityScreen(
                 }
             }
         }
+    }
+    
+    // Diálogo modal de comentarios
+    if (showCommentsDialog && selectedPostForComments != null) {
+        CommentsDialog(
+            post = selectedPostForComments!!,
+            comments = uiState.comments[selectedPostForComments!!.id] ?: emptyList(),
+            isLoading = uiState.isLoadingComments,
+            isAddingComment = uiState.isAddingComment,
+            onDismiss = { 
+                showCommentsDialog = false
+                selectedPostForComments = null
+                viewModel.clearCommentSuccess()
+            },
+            onAddComment = { content ->
+                viewModel.addComment(selectedPostForComments!!.id, content)
+            },
+            onViewAllComments = {
+                showCommentsDialog = false
+                onNavigateToPostDetail(selectedPostForComments!!.id)
+                selectedPostForComments = null
+            }
+        )
     }
     
     // Login dialog for guests
@@ -242,13 +282,268 @@ fun CommunityScreen(
     }
 }
 
+/**
+ * Diálogo modal para ver los últimos 2 comentarios y agregar uno nuevo
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CommentsDialog(
+    post: CommunityPostResponse,
+    comments: List<CommentResponse>,
+    isLoading: Boolean,
+    isAddingComment: Boolean,
+    onDismiss: () -> Unit,
+    onAddComment: (String) -> Unit,
+    onViewAllComments: () -> Unit
+) {
+    var commentText by remember { mutableStateOf("") }
+    val latestComments = comments.take(2)
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    Icons.Default.Comment,
+                    contentDescription = null,
+                    tint = BlueInfo
+                )
+                Text("Comentarios")
+                if (post.commentsCount > 0) {
+                    Surface(
+                        shape = CircleShape,
+                        color = BlueInfo.copy(alpha = 0.1f)
+                    ) {
+                        Text(
+                            text = "${post.commentsCount}",
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = BlueInfo
+                        )
+                    }
+                }
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Mostrar los últimos 2 comentarios
+                if (isLoading) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().height(100.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                    }
+                } else if (latestComments.isEmpty()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color(0xFFF5F5F5)
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(
+                                Icons.Default.ChatBubbleOutline,
+                                contentDescription = null,
+                                tint = Color.Gray,
+                                modifier = Modifier.size(32.dp)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                "No hay comentarios aún",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.Gray
+                            )
+                            Text(
+                                "¡Sé el primero en comentar!",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.Gray
+                            )
+                        }
+                    }
+                } else {
+                    latestComments.forEach { comment ->
+                        CommentItem(comment = comment)
+                    }
+                    
+                    // Botón para ver todos los comentarios si hay más de 2
+                    if (post.commentsCount > 2) {
+                        TextButton(
+                            onClick = onViewAllComments,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                "Ver todos los comentarios (${post.commentsCount})",
+                                color = GreenPrimary
+                            )
+                            Icon(
+                                Icons.Default.ChevronRight,
+                                contentDescription = null,
+                                tint = GreenPrimary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+                
+                HorizontalDivider()
+                
+                // Campo para agregar comentario
+                OutlinedTextField(
+                    value = commentText,
+                    onValueChange = { commentText = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Escribe un comentario...") },
+                    maxLines = 3,
+                    enabled = !isAddingComment,
+                    trailingIcon = {
+                        if (isAddingComment) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            IconButton(
+                                onClick = {
+                                    if (commentText.isNotBlank()) {
+                                        onAddComment(commentText)
+                                        commentText = ""
+                                    }
+                                },
+                                enabled = commentText.isNotBlank()
+                            ) {
+                                Icon(
+                                    Icons.Default.Send,
+                                    contentDescription = "Enviar",
+                                    tint = if (commentText.isNotBlank()) GreenPrimary else Color.Gray
+                                )
+                            }
+                        }
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = GreenPrimary,
+                        cursorColor = GreenPrimary
+                    )
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onViewAllComments) {
+                Text("Ver detalles", color = GreenPrimary)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cerrar")
+            }
+        }
+    )
+}
+
+/**
+ * Item individual de comentario
+ */
+@Composable
+fun CommentItem(comment: CommentResponse) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFFF8F9FA)
+        )
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Avatar del usuario
+                Surface(
+                    modifier = Modifier.size(32.dp),
+                    shape = CircleShape,
+                    color = GreenLight
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Default.Person,
+                            contentDescription = null,
+                            tint = GreenPrimary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+                
+                Column(modifier = Modifier.weight(1f)) {
+                    // Nombre del autor
+                    Text(
+                        text = comment.authorName ?: "Usuario #${comment.userId}",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = GreenPrimary
+                    )
+                    // Fecha
+                    Text(
+                        text = comment.createdAt.take(10),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.Gray
+                    )
+                }
+                
+                // Badge si es solución
+                if (comment.isSolution) {
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = GreenPrimary.copy(alpha = 0.1f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = GreenPrimary,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                "Solución",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = GreenPrimary
+                            )
+                        }
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // Contenido del comentario
+            Text(
+                text = comment.content,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CommunityPostCard(
     post: CommunityPostResponse,
+    isLiked: Boolean = false,
     isGuestMode: Boolean = false,
     onLike: () -> Unit,
-    onComment: () -> Unit
+    onComment: () -> Unit,
+    onViewDetails: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -445,15 +740,19 @@ fun CommunityPostCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // Likes
+                    // Likes - Corazón relleno si dio like, solo borde si no
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconButton(
                             onClick = onLike,
                             modifier = Modifier.size(36.dp)
                         ) {
                             Icon(
-                                Icons.Default.Favorite,
-                                contentDescription = "Me gusta",
+                                imageVector = if (isLiked) {
+                                    Icons.Default.Favorite  // Corazón relleno
+                                } else {
+                                    Icons.Outlined.FavoriteBorder  // Corazón solo borde
+                                },
+                                contentDescription = if (isLiked) "Quitar me gusta" else "Me gusta",
                                 tint = RedError,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -487,7 +786,7 @@ fun CommunityPostCard(
                 }
                 
                 // Ver más button
-                TextButton(onClick = { /* TODO: Navigate to detail */ }) {
+                TextButton(onClick = onViewDetails) {
                     Text("Ver detalles", color = GreenPrimary)
                     Icon(
                         Icons.Default.ChevronRight,
