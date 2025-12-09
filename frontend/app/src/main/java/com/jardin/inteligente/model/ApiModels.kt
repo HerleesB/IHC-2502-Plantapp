@@ -162,6 +162,23 @@ data class PlantUpdateRequest(
 )
 
 /**
+ * Respuesta de eliminar planta (CU-04)
+ */
+data class DeletePlantResponse(
+    @SerializedName("success")
+    val success: Boolean,
+    
+    @SerializedName("message")
+    val message: String,
+    
+    @SerializedName("plant_name")
+    val plantName: String,
+    
+    @SerializedName("diagnoses_deleted")
+    val diagnosesDeleted: Int
+)
+
+/**
  * Historial de diagnósticos (CU-08)
  */
 data class DiagnosisHistoryResponse(

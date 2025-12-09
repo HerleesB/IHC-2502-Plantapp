@@ -114,11 +114,12 @@ class PlantRepository(private val context: Context) {
         }
     }
     
-    suspend fun deletePlant(plantId: Int): ApiResult<Unit> = withContext(Dispatchers.IO) {
+    suspend fun deletePlant(plantId: Int, userId: Int): ApiResult<DeletePlantResponse> = withContext(Dispatchers.IO) {
         try {
-            val response = apiService.deletePlant(plantId)
-            if (response.isSuccessful) {
-                ApiResult.Success(Unit)
+            val response = apiService.deletePlant(plantId, userId)
+            if (response.isSuccessful && response.body() != null) {
+                Log.d("PlantRepository", "Plant deleted: ${response.body()!!.message}")
+                ApiResult.Success(response.body()!!)
             } else {
                 ApiResult.Error("Error al eliminar planta: ${response.code()}")
             }
